@@ -13,7 +13,6 @@ Complete documentation for the Quantum TDSE Simulator project.
   - Examples and use cases
 
 - **[Quick Start Guide](QUICKSTART.md)** - Get started in 5 minutes
-  - Online demo link
   - Local setup
   - First simulation
   - Quick examples
@@ -39,7 +38,7 @@ Complete documentation for the Quantum TDSE Simulator project.
   - Feature development
 
 - **[Changelog](../CHANGELOG.md)** - Version history
-  - Latest features (v2.0.0)
+  - Latest features (v1.0.0)
   - Bug fixes
   - Breaking changes
   - Planned features
@@ -47,7 +46,7 @@ Complete documentation for the Quantum TDSE Simulator project.
 ## 🎯 Quick Links
 
 ### For Users
-- **Try it now:** [Live Demo](https://ejkybaysifww.space.minimax.io)
+
 - **Get started:** [Quick Start Guide](QUICKSTART.md)
 - **Learn parameters:** [Parameter Guide](PARAMETER_GUIDE.md)
 - **See examples:** [README Examples](../README.md#example-use-cases)
@@ -92,9 +91,8 @@ Complete documentation for the Quantum TDSE Simulator project.
 
 ### Beginner
 1. Read [Quick Start Guide](QUICKSTART.md)
-2. Try the [live demo](https://ejkybaysifww.space.minimax.io)
-3. Run [example experiments](QUICKSTART.md#example-experiments)
-4. Learn about [physics background](../README.md#physics-background)
+2. Run [example experiments](QUICKSTART.md#example-experiments)
+3. Learn about [physics background](../README.md#physics-background)
 
 ### Intermediate
 1. Explore [parameter system](PARAMETER_GUIDE.md)
@@ -143,7 +141,7 @@ Complete documentation for the Quantum TDSE Simulator project.
 
 ### General
 **Q: Do I need to install anything?**
-A: No, use the [online version](https://ejkybaysifww.space.minimax.io). For local development, see [Quick Start](QUICKSTART.md).
+For local development, see [Quick Start](QUICKSTART.md).
 
 **Q: How accurate is the simulation?**
 A: Very accurate for 1D systems. See [Numerical Accuracy](../README.md#numerical-accuracy).
@@ -187,7 +185,7 @@ A: Modern browsers (Chrome, Firefox, Safari, Edge). See [Prerequisites](../READM
 ## 🌟 Additional Resources
 
 ### External Links
-- [Live Demo](https://ejkybaysifww.space.minimax.io)
+
 - [Split-Operator Method Paper](https://doi.org/10.1016/0021-9991(82)90091-2)
 - [Quantum Mechanics Textbooks](../README.md#quantum-mechanics)
 - [Numerical Recipes](../README.md#numerical-methods)

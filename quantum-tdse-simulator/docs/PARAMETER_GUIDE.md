@@ -3,8 +3,6 @@
 
 Your quantum simulator now includes a powerful Desmos-style parameter system that allows you to create dynamic custom functions with interactive sliders!
 
-**🔗 Live Application:** https://ejkybaysifww.space.minimax.io
-
 ---
 
 ## 🚀 How to Use Parameter Sliders

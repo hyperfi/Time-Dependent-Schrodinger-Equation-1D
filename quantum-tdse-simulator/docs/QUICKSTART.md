@@ -2,13 +2,8 @@
 
 Get started with the Quantum TDSE Simulator in 5 minutes!
 
-## 🌐 Option 1: Use Online (Fastest)
 
-Just visit: **[https://ejkybaysifww.space.minimax.io](https://ejkybaysifww.space.minimax.io)**
-
-No installation required!
-
-## 💻 Option 2: Run Locally
+## 💻 Run Locally
 
 ```bash
 # Install and run
