@@ -7,6 +7,7 @@
     "dev": "pnpm install --prefer-offline && vite",
     "build": "pnpm install --prefer-offline && rm -rf node_modules/.vite-temp && tsc -b && vite build",
     "build:prod": "pnpm install --prefer-offline && rm -rf node_modules/.vite-temp && tsc -b && BUILD_MODE=prod vite build",
+    "build:github": "pnpm install --prefer-offline && rm -rf node_modules/.vite-temp && tsc -b && GITHUB_PAGES=true vite build",
     "lint": "pnpm install --prefer-offline && eslint .",
     "preview": "pnpm install --prefer-offline && vite preview",
     "install-deps": "pnpm install --prefer-offline",
