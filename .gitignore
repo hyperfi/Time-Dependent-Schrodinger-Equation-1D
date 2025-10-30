@@ -9,7 +9,6 @@ node_modules/
 .pnpm-debug.log
 
 ### Build output
-dist/
 build/
 out/
 .vite/
