@@ -67,11 +67,7 @@ desktop.ini
 *.log
 *.tmp
 
-### Optional: package-lock for npm users (we use pnpm; keep pnpm-lock.yaml)
-package-lock.json
 
-# Keep lockfile for pnpm in repository
-!pnpm-lock.yaml
 
 # ESLint cache
 .eslintcache
