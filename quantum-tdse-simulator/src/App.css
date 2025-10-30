@@ -79,19 +79,19 @@ button {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-/* Hide number input spinners for all browsers */
-input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button {
+/* Hide number input spinners only for specific inputs (e.g., frame rate) */
+input[type="number"].no-spinners::-webkit-outer-spin-button,
+input[type="number"].no-spinners::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
 
-input[type="number"] {
+input[type="number"].no-spinners {
   -moz-appearance: textfield;
   appearance: textfield;
 }
 
 /* Firefox */
-input[type="number"]::-moz-number-spinner {
+input[type="number"].no-spinners::-moz-number-spinner {
   display: none;
 }

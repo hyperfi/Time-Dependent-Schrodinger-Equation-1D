@@ -11,6 +11,7 @@ import { TDSESolver, WavefunctionState, createGaussianWavepacket, createPlaneWav
 import { generatePotential, validatePotentialFunction } from './lib/potentials';
 import { validateWavefunctionFunctions } from './lib/wavefunctions';
 import { Settings, X } from 'lucide-react';
+import JSZip from 'jszip';
 import './App.css';
 
 const DEFAULT_CONFIG: SimulationConfig = {
@@ -54,6 +55,8 @@ function App() {
   const [drawnPotentialVersion, setDrawnPotentialVersion] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingProgress, setRecordingProgress] = useState(0);
+  const [isExportingZip, setIsExportingZip] = useState(false);
+  const [zipProgress, setZipProgress] = useState(0);
   
   // Panel resize and visibility state
   const [isPanelVisible, setIsPanelVisible] = useState(true);
@@ -63,6 +66,8 @@ function App() {
   const videoRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
   const recordingAnimationRef = useRef<number | null>(null);
+  const zipExportAnimationRef = useRef<number | null>(null);
+  const zipFramesRef = useRef<string[]>([]);
   
   const animationFrameRef = useRef<number | null>(null);
   const boundaryWarningShownRef = useRef(false);
@@ -81,6 +86,15 @@ function App() {
       recordingAnimationRef.current = null;
     }
   }, [isRecording]);
+  
+  // Clean up ZIP export animation when export stops
+  useEffect(() => {
+    if (!isExportingZip && zipExportAnimationRef.current) {
+      cancelAnimationFrame(zipExportAnimationRef.current);
+      zipExportAnimationRef.current = null;
+      zipFramesRef.current = [];
+    }
+  }, [isExportingZip]);
   
   // Drag divider handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -618,6 +632,198 @@ function App() {
     }
   };
   
+  const handleDownloadFramesAsZip = async (frameRate: number, startTime: number, endTime: number) => {
+    if (isExportingZip) {
+      alert('Frame export is already in progress');
+      return;
+    }
+    
+    const canvas = document.querySelector('canvas') as HTMLCanvasElement;
+    if (!canvas) {
+      alert('No visualization canvas found');
+      return;
+    }
+    
+    if (endTime <= startTime) {
+      alert('End time must be greater than start time');
+      return;
+    }
+    
+    if (!solver || !state) {
+      alert('No simulation state found. Please start a simulation first.');
+      return;
+    }
+    
+    try {
+      setIsExportingZip(true);
+      setZipProgress(0);
+      zipFramesRef.current = [];
+      
+      // Store original state
+      const wasRunning = isRunning;
+      const originalStep = config.stepsPerFrame;
+      
+      // Stop normal animation
+      setIsRunning(false);
+      
+      // Reset simulation to start time
+      const initialState = createGaussianWavepacket(
+        solver,
+        config.wavefunctionX0,
+        config.wavefunctionSigma,
+        config.wavefunctionK0
+      );
+      
+      const resetState = {
+        real: new Float64Array(initialState.real),
+        imag: new Float64Array(initialState.imag),
+        time: 0
+      };
+      setState(resetState);
+      
+      // Calculate simulation steps to reach start time
+      const stepsToStart = Math.floor(startTime / config.dt);
+      for (let i = 0; i < stepsToStart; i++) {
+        solver.step(resetState);
+      }
+      
+      // Update state to start time
+      const startState = {
+        real: new Float64Array(resetState.real),
+        imag: new Float64Array(resetState.imag),
+        time: startTime
+      };
+      setState(startState);
+      
+      // Wait a moment for state update
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Frame-by-frame capture with manual animation control
+      const totalDuration = endTime - startTime;
+      const totalFrames = Math.floor(totalDuration * frameRate);
+      const timePerFrame = totalDuration / totalFrames;
+      const simulationStepsPerFrame = Math.max(1, Math.floor(timePerFrame / config.dt));
+      
+      let currentFrame = 0;
+      
+      const captureFrame = () => {
+        if (currentFrame >= totalFrames) {
+          // All frames captured, now create ZIP
+          createZipAndDownload(totalFrames, wasRunning, originalStep);
+          return;
+        }
+        
+        // Advance simulation by the required number of steps for this frame
+        const currentState = stateRef.current;
+        if (currentState) {
+          for (let i = 0; i < simulationStepsPerFrame; i++) {
+            solver.step(currentState);
+          }
+          
+          // Force React update with new state
+          const newState = {
+            real: new Float64Array(currentState.real),
+            imag: new Float64Array(currentState.imag),
+            time: currentState.time
+          };
+          setState(newState);
+          
+          // Update energy and probability
+          setEnergy(solver.getEnergy(currentState));
+          setTotalProbability(solver.getTotalProbability(currentState));
+        }
+        
+        // Wait for render, then capture the frame
+        requestAnimationFrame(() => {
+          const dataURL = canvas.toDataURL('image/png');
+          zipFramesRef.current.push(dataURL);
+          
+          // Update progress
+          currentFrame++;
+          setZipProgress((currentFrame / totalFrames) * 100);
+          
+          // Schedule next frame
+          zipExportAnimationRef.current = requestAnimationFrame(captureFrame);
+        });
+      };
+      
+      // Helper function to create and download ZIP
+      const createZipAndDownload = async (totalFrames: number, wasRunning: boolean, originalStep: number) => {
+        try {
+          const zip = new JSZip();
+          
+          // Add each frame to the ZIP file
+          for (let i = 0; i < zipFramesRef.current.length; i++) {
+            const dataURL = zipFramesRef.current[i];
+            const base64Data = dataURL.split(',')[1];
+            const frameNumber = String(i + 1).padStart(5, '0');
+            zip.file(`frame_${frameNumber}.png`, base64Data, { base64: true });
+          }
+          
+          // Add a metadata file
+          const metadata = {
+            totalFrames: totalFrames,
+            frameRate: frameRate,
+            startTime: startTime,
+            endTime: endTime,
+            duration: endTime - startTime,
+            exportDate: new Date().toISOString(),
+            simulationConfig: {
+              potentialType: config.potentialType,
+              gridSize: config.gridSize,
+              dt: config.dt
+            }
+          };
+          zip.file('metadata.json', JSON.stringify(metadata, null, 2));
+          
+          // Generate ZIP file
+          const blob = await zip.generateAsync({ type: 'blob' });
+          
+          // Download the ZIP file
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `tdse_frames_${Date.now()}.zip`;
+          a.click();
+          URL.revokeObjectURL(url);
+          
+          // Clean up
+          setIsExportingZip(false);
+          setZipProgress(0);
+          zipFramesRef.current = [];
+          handleConfigChange({ stepsPerFrame: originalStep });
+          if (wasRunning) {
+            setIsRunning(true);
+          }
+        } catch (error) {
+          console.error('Error creating ZIP file:', error);
+          alert('Failed to create ZIP file. Please try again.');
+          setIsExportingZip(false);
+          setZipProgress(0);
+          zipFramesRef.current = [];
+          handleConfigChange({ stepsPerFrame: originalStep });
+          if (wasRunning) {
+            setIsRunning(true);
+          }
+        }
+      };
+      
+      // Start frame capture
+      zipExportAnimationRef.current = requestAnimationFrame(captureFrame);
+      
+    } catch (error) {
+      console.error('Error exporting frames:', error);
+      alert('Failed to start frame export. Please try again.');
+      setIsExportingZip(false);
+      setZipProgress(0);
+      zipFramesRef.current = [];
+      handleConfigChange({ stepsPerFrame: config.stepsPerFrame });
+      if (isRunning) {
+        setIsRunning(true);
+      }
+    }
+  };
+  
   return (
     <div className="w-screen h-screen flex flex-col md:flex-row overflow-hidden bg-surface-primary">
       {/* Control Panel - Conditionally Rendered */}
@@ -637,8 +843,11 @@ function App() {
             onLoad={handleLoad}
             onDownloadCurrentFrame={handleDownloadCurrentFrame}
             onDownloadVideo={handleDownloadVideo}
+            onDownloadFramesAsZip={handleDownloadFramesAsZip}
             isRecording={isRecording}
             recordingProgress={recordingProgress}
+            isExportingZip={isExportingZip}
+            zipProgress={zipProgress}
           />
         </div>
       )}

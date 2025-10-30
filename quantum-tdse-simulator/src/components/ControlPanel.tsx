@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react';
-import { Play, Pause, RotateCcw, Upload, Download, Video, Camera } from 'lucide-react';
+import { Play, Pause, RotateCcw, Upload, Download, Video, Camera, FileArchive } from 'lucide-react';
 import { PotentialType, PRESET_POTENTIALS } from '../lib/potentials';
 import { WavefunctionType, PRESET_WAVEFUNCTIONS } from '../lib/wavefunctions';
 import { ParameterSet } from '../lib/parameters';
@@ -57,8 +57,11 @@ interface ControlPanelProps {
   onLoad: (file: File) => void;
   onDownloadCurrentFrame: () => void;
   onDownloadVideo: (format: string, frameRate: number, quality: string, startTime: number, endTime: number) => void;
+  onDownloadFramesAsZip: (frameRate: number, startTime: number, endTime: number) => void;
   isRecording?: boolean;
   recordingProgress?: number;
+  isExportingZip?: boolean;
+  zipProgress?: number;
 }
 
 export function ControlPanel({
@@ -72,8 +75,11 @@ export function ControlPanel({
   onLoad,
   onDownloadCurrentFrame,
   onDownloadVideo,
+  onDownloadFramesAsZip,
   isRecording = false,
-  recordingProgress = 0
+  recordingProgress = 0,
+  isExportingZip = false,
+  zipProgress = 0
 }: ControlPanelProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [videoFormat, setVideoFormat] = useState('mp4');
@@ -608,7 +614,7 @@ export function ControlPanel({
             <button
               onClick={onDownloadCurrentFrame}
               className="w-full h-[48px] bg-surface-primary border-2 border-text-primary hover:bg-surface-tertiary text-text-primary text-sm font-bold uppercase tracking-wide rounded-sm transition-fast flex items-center justify-center gap-2"
-              disabled={isRecording}
+              disabled={isRecording || isExportingZip}
             >
               <Camera size={16} />
               Download Current Frame
@@ -625,7 +631,7 @@ export function ControlPanel({
                     value={videoFormat}
                     onChange={(e) => setVideoFormat(e.target.value)}
                     className="w-full h-[40px] px-2 bg-surface-primary border border-border-default rounded-none text-sm font-mono focus:outline-none focus:border-2 focus:border-border-focus"
-                    disabled={isRecording}
+                    disabled={isRecording || isExportingZip}
                   >
                     <option value="mp4">MP4</option>
                     <option value="webm">WebM</option>
@@ -658,16 +664,12 @@ export function ControlPanel({
                     min="1"
                     max="120"
                     step="1"
-                    className={`w-full h-[40px] px-2 bg-surface-primary border rounded-none text-sm font-mono focus:outline-none focus:border-2 focus:border-border-focus ${
+                    className={`no-spinners w-full h-[40px] px-2 bg-surface-primary border rounded-none text-sm font-mono focus:outline-none focus:border-2 focus:border-border-focus ${
                       frameRateError 
                         ? 'border-red-500 focus:border-red-500' 
                         : 'border-border-default'
                     }`}
-                    disabled={isRecording}
-                    style={{
-                      WebkitAppearance: 'none',
-                      MozAppearance: 'textfield'
-                    }}
+                    disabled={isRecording || isExportingZip}
                   />
                   {frameRateError && (
                     <p className="text-xs text-red-500 mt-1">
@@ -708,7 +710,7 @@ export function ControlPanel({
                     step="0.1"
                     min="0"
                     className="w-full h-[40px] px-2 bg-surface-primary border border-border-default rounded-none text-sm font-mono focus:outline-none focus:border-2 focus:border-border-focus"
-                    disabled={isRecording}
+                    disabled={isRecording || isExportingZip}
                   />
                 </div>
                 
@@ -723,7 +725,7 @@ export function ControlPanel({
                     step="0.1"
                     min={startTime}
                     className="w-full h-[40px] px-2 bg-surface-primary border border-border-default rounded-none text-sm font-mono focus:outline-none focus:border-2 focus:border-border-focus"
-                    disabled={isRecording}
+                    disabled={isRecording || isExportingZip}
                   />
                 </div>
               </div>
@@ -731,16 +733,32 @@ export function ControlPanel({
               <button
                 onClick={() => onDownloadVideo(videoFormat, frameRate, quality, startTime, endTime)}
                 className={`w-full h-[48px] text-sm font-bold uppercase tracking-wide rounded-sm transition-fast flex items-center justify-center gap-2 ${
-                  isRecording || frameRateError || frameRate < 1 || frameRate > 120
+                  isRecording || isExportingZip || frameRateError || frameRate < 1 || frameRate > 120
                     ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
                     : 'bg-accent-primary hover:bg-accent-dark text-surface-primary'
                 }`}
-                disabled={isRecording || endTime <= startTime || !!frameRateError || frameRate < 1 || frameRate > 120}
+                disabled={isRecording || isExportingZip || endTime <= startTime || !!frameRateError || frameRate < 1 || frameRate > 120}
               >
                 <Video size={16} />
                 {isRecording 
                   ? `Recording... ${recordingProgress.toFixed(0)}%`
                   : 'Download Video'
+                }
+              </button>
+              
+              <button
+                onClick={() => onDownloadFramesAsZip(frameRate, startTime, endTime)}
+                className={`w-full h-[48px] text-sm font-bold uppercase tracking-wide rounded-sm transition-fast flex items-center justify-center gap-2 mt-2 ${
+                  isExportingZip || isRecording || frameRateError || frameRate < 1 || frameRate > 120
+                    ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                    : 'bg-surface-primary border-2 border-text-primary hover:bg-surface-tertiary text-text-primary'
+                }`}
+                disabled={isExportingZip || isRecording || endTime <= startTime || !!frameRateError || frameRate < 1 || frameRate > 120}
+              >
+                <FileArchive size={16} />
+                {isExportingZip 
+                  ? `Exporting... ${zipProgress.toFixed(0)}%`
+                  : 'Export Frames as ZIP'
                 }
               </button>
             </div>

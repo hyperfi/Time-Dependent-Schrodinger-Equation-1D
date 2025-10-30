@@ -1,0 +1,80 @@
+# .gitignore for Time-Dependent-Schrodinger-Equation-1D
+# Tailored for a Vite + TypeScript + pnpm project
+
+### Node dependencies
+node_modules/
+
+### pnpm stores & caches
+.pnpm-store/
+.pnpm-debug.log
+
+### Build output
+dist/
+build/
+out/
+.vite/
+
+### TypeScript
+*.tsbuildinfo
+
+### Environment files (do NOT commit secrets)
+.env
+.env.*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+### Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+### Coverage
+coverage/
+.nyc_output/
+
+### Test / cache directories
+.cache/
+.jest/
+.vitest/
+.parcel-cache/
+
+### Editor directories and files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swo
+.history/
+
+### OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+### Misc
+*.pem
+*.key
+*.crt
+*.env.*.local
+*.log
+*.tmp
+
+### Optional: package-lock for npm users (we use pnpm; keep pnpm-lock.yaml)
+package-lock.json
+
+# Keep lockfile for pnpm in repository
+!pnpm-lock.yaml
+
+# ESLint cache
+.eslintcache
+
+# Vite cache
+.vite
