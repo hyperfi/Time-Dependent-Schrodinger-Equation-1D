@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Swiss Design - Keep it simple */
+    --radius: 0rem;
+  }
+
+  * {
+    @apply border-border-default;
+  }
+  
+  body {
+    @apply bg-surface-primary text-text-secondary;
+  }
+}
+
+/* Remove Radix UI default styles that conflict with Swiss Design */
+[data-radix-scroll-area-viewport] {
+  scrollbar-width: thin;
+  scrollbar-color: #CCCCCC #F5F5F5;
+}
