@@ -6,7 +6,7 @@ import sourceIdentifierPlugin from 'vite-plugin-source-identifier'
 const isProd = process.env.BUILD_MODE === 'prod'
 export default defineConfig({
     // Base path for GitHub Pages - change 'quantum-tdse-simulator' to your repo name
-  base: process.env.GITHUB_PAGES ? '/Time-Dependent-Schrodinger-Equation-1D/quantum-tdse-simulator/' : '/',
+  base: process.env.GITHUB_PAGES ? '/Time-Dependent-Schrodinger-Equation-1D/' : '/',
   plugins: [
     react(), 
     sourceIdentifierPlugin({
