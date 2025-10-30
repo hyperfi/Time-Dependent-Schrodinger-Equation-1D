@@ -147,7 +147,7 @@ For local development, see [Quick Start](QUICKSTART.md).
 A: Very accurate for 1D systems. See [Numerical Accuracy](../README.md#numerical-accuracy).
 
 **Q: Can I use this for research?**
-A: Yes! It's suitable for educational and research purposes. See [License](../README.md#license).
+A: Yes! It's suitable for educational and research purposes by citing the author and this repository.
 
 ### Parameters
 **Q: How do I add parameters?**
