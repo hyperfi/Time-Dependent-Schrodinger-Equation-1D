@@ -44,6 +44,15 @@ export function QuantumVisualization({
 }: VisualizationProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sketchRef = useRef<p5 | null>(null);
+  const localPotentialRef = useRef<Float64Array | null>(null);
+  const isDrawingRef = useRef(false);
+
+  // Synchronize local potential ref when potential prop changes
+  useEffect(() => {
+    if (!isDrawingRef.current) {
+      localPotentialRef.current = new Float64Array(potential);
+    }
+  }, [potential]);
   
   // Use refs to hold current prop values for p5 sketch access
   const propsRef = useRef({
@@ -119,6 +128,7 @@ export function QuantumVisualization({
         
         if (xVal >= plotX && xVal <= plotX + plotWidth && yVal >= plotY && yVal <= plotY + plotHeight) {
           isDrawing = true;
+          isDrawingRef.current = true;
           lastX = xVal;
           lastY = yVal;
           currX = xVal;
@@ -140,11 +150,17 @@ export function QuantumVisualization({
 
       const endDraw = () => {
         isDrawing = false;
+        isDrawingRef.current = false;
       };
 
       const performDrawingUpdate = (x1: number, y1: number, x2: number, y2: number) => {
-        const { x, potential, potentialType, onDrawPotential, plotXMin, plotXMax, plotYMin, plotYMax } = propsRef.current;
+        const { x, potentialType, onDrawPotential, plotXMin, plotXMax, plotYMin, plotYMax } = propsRef.current;
         if (potentialType !== 'custom-draw' || x.length === 0 || !onDrawPotential) return;
+        
+        if (!localPotentialRef.current) {
+          localPotentialRef.current = new Float64Array(x.length);
+        }
+        const newPotential = localPotentialRef.current;
         
         const margin = {
           left: 60,
@@ -162,7 +178,6 @@ export function QuantumVisualization({
         
         if (!inPlot(x2) && !inPlot(x1)) return;
         
-        const newPotential = new Float64Array(potential);
         const startPx = Math.max(plotX, Math.min(x1, x2));
         const endPx = Math.min(plotX + plotWidth, Math.max(x1, x2));
         
@@ -209,7 +224,7 @@ export function QuantumVisualization({
           }
         }
         
-        onDrawPotential(newPotential);
+        onDrawPotential(new Float64Array(newPotential));
       };
 
       p.setup = () => {
@@ -318,8 +333,12 @@ export function QuantumVisualization({
         // Draw axes
         drawAxes(p, plotX, plotY, plotWidth, plotHeight, xMin, xMax, yMin, yMax, mapX, mapY);
         
+        const activePotential = (potentialType === 'custom-draw' && localPotentialRef.current)
+          ? localPotentialRef.current
+          : potential;
+
         // Draw visual instruction overlay if custom-draw is empty
-        if (potentialType === 'custom-draw' && isPotentialAllZero(potential)) {
+        if (potentialType === 'custom-draw' && isPotentialAllZero(activePotential)) {
           p.fill(120, 120, 120, 150);
           p.noStroke();
           p.textAlign(p.CENTER, p.CENTER);
@@ -333,8 +352,8 @@ export function QuantumVisualization({
         (p.drawingContext as any).setLineDash([4, 4]);
         p.noFill();
         p.beginShape();
-        for (let i = 0; i < potential.length; i++) {
-          p.vertex(mapX(x[i]), mapY(potential[i] * POTENTIAL_VISUAL_SCALE));
+        for (let i = 0; i < activePotential.length; i++) {
+          p.vertex(mapX(x[i]), mapY(activePotential[i] * POTENTIAL_VISUAL_SCALE));
         }
         p.endShape();
         (p.drawingContext as any).setLineDash([]);
