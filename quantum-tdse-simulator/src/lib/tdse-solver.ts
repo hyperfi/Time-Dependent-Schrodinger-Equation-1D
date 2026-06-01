@@ -16,6 +16,9 @@ export interface SimulationParameters {
   dt: number;                 // Time step
   hbar: number;               // Reduced Planck constant (ℏ)
   mass: number;               // Particle mass
+  abcEnabled?: boolean;       // Enable absorbing boundary conditions
+  abcWidth?: number;          // Spatial width of absorbing region
+  abcStrength?: number;       // Absorption strength
 }
 
 export interface WavefunctionState {
@@ -42,6 +45,9 @@ export class TDSESolver {
   private expVhalf_imag: Float64Array;  // sin(-VΔt/2ℏ)
   private expT_real: Float64Array;      // cos(-ℏk²Δt/2m)
   private expT_imag: Float64Array;      // sin(-ℏk²Δt/2m)
+  
+  // Absorbing boundary mask
+  private abcMask: Float64Array;
   
   // Current potential
   private potential: Float64Array;
@@ -80,9 +86,12 @@ export class TDSESolver {
     this.expT_real = new Float64Array(n);
     this.expT_imag = new Float64Array(n);
     this.potential = new Float64Array(n);
+    this.abcMask = new Float64Array(n);
     
     // Pre-compute kinetic operator (doesn't change with potential)
     this.updateKineticOperator();
+    // Pre-compute absorbing boundary mask
+    this.updateAbsorbingMask();
   }
   
   /**
@@ -97,6 +106,43 @@ export class TDSESolver {
       this.expT_real[i] = Math.cos(phase);
       this.expT_imag[i] = Math.sin(phase);
     }
+  }
+  
+  /**
+   * Pre-compute the absorbing boundary mask
+   */
+  public updateAbsorbingMask(): void {
+    const { gridSize, xMin, xMax, abcEnabled, abcWidth, abcStrength, dt } = this.params;
+    const n = gridSize;
+    const width = abcWidth ?? 2.0;
+    const strength = abcStrength ?? 0.5;
+    const enabled = abcEnabled ?? false;
+    
+    for (let i = 0; i < n; i++) {
+      const xi = this.x[i];
+      // Distance from boundary (if within width)
+      const distL = Math.max(0, (xMin + width) - xi);
+      const distR = Math.max(0, xi - (xMax - width));
+      const dist = Math.max(distL, distR);
+      
+      if (enabled && dist > 0) {
+        // Smooth quadratic absorption. Scale dt to make strength parameter intuitive.
+        const frac = dist / width;
+        this.abcMask[i] = Math.exp(-strength * frac * frac * dt * 100);
+      } else {
+        this.abcMask[i] = 1.0;
+      }
+    }
+  }
+  
+  /**
+   * Update ABC settings dynamically
+   */
+  public setABC(enabled: boolean, width: number, strength: number): void {
+    this.params.abcEnabled = enabled;
+    this.params.abcWidth = width;
+    this.params.abcStrength = strength;
+    this.updateAbsorbingMask();
   }
   
   /**
@@ -196,20 +242,30 @@ export class TDSESolver {
     const psi_out = this.fft.createComplexArray();
     this.fft.inverseTransform(psi_out, psi_k_interleaved);
     
-    // Extract and normalize by FFT size
+    // Extract from FFT size (fft.js already divides by N internally)
     for (let i = 0; i < n; i++) {
-      state.real[i] = psi_out[2 * i] / n;
-      state.imag[i] = psi_out[2 * i + 1] / n;
+      state.real[i] = psi_out[2 * i];
+      state.imag[i] = psi_out[2 * i + 1];
     }
     
     // Step 5: Apply potential operator (half step)
     this.applyPotentialOperator(state.real, state.imag);
     
+    // Apply absorbing boundary condition mask
+    if (this.params.abcEnabled) {
+      for (let i = 0; i < n; i++) {
+        state.real[i] *= this.abcMask[i];
+        state.imag[i] *= this.abcMask[i];
+      }
+    }
+    
     // Update time
     state.time += this.params.dt;
     
-    // Normalize wavefunction to ensure probability conservation
-    this.normalize(state);
+    // Normalize wavefunction to ensure probability conservation (only if ABC is disabled)
+    if (!this.params.abcEnabled) {
+      this.normalize(state);
+    }
     
     return state;
   }

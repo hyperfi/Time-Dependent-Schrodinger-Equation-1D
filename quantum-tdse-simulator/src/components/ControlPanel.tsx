@@ -44,6 +44,11 @@ export interface SimulationConfig {
   plotXMax: number;
   plotYMin: number;
   plotYMax: number;
+
+  // Absorbing boundary settings
+  abcEnabled: boolean;
+  abcWidth: number;
+  abcStrength: number;
 }
 
 interface ControlPanelProps {
@@ -58,6 +63,7 @@ interface ControlPanelProps {
   onDownloadCurrentFrame: () => void;
   onDownloadVideo: (format: string, frameRate: number, quality: string, startTime: number, endTime: number) => void;
   onDownloadFramesAsZip: (frameRate: number, startTime: number, endTime: number) => void;
+  onClearDrawnPotential?: () => void;
   isRecording?: boolean;
   recordingProgress?: number;
   isExportingZip?: boolean;
@@ -76,6 +82,7 @@ export function ControlPanel({
   onDownloadCurrentFrame,
   onDownloadVideo,
   onDownloadFramesAsZip,
+  onClearDrawnPotential,
   isRecording = false,
   recordingProgress = 0,
   isExportingZip = false,
@@ -131,6 +138,21 @@ export function ControlPanel({
             <option value="custom-function">Custom Function</option>
             <option value="custom-draw">Draw Custom</option>
           </select>
+          
+          {config.potentialType === 'custom-draw' && (
+            <div className="mt-3 p-3 bg-surface-primary border border-border-default space-y-2">
+              <p className="text-xs text-text-secondary font-medium">
+                🎨 Draw directly on the simulation chart by clicking and dragging.
+              </p>
+              <button
+                type="button"
+                onClick={onClearDrawnPotential}
+                className="w-full h-[36px] bg-surface-secondary border border-text-primary hover:bg-surface-tertiary text-text-primary text-xs font-bold uppercase tracking-wide rounded-none transition-fast flex items-center justify-center"
+              >
+                Clear Drawn Potential
+              </button>
+            </div>
+          )}
           
           {/* Potential Parameters */}
           {(config.potentialType === 'barrier' || config.potentialType === 'well') && (
@@ -599,6 +621,54 @@ export function ControlPanel({
                   className="w-full h-[48px] px-4 bg-surface-primary border border-border-default rounded-none text-base font-mono focus:outline-none focus:border-2 focus:border-border-focus"
                 />
               </div>
+
+              <div className="pt-4 border-t border-border-default space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium uppercase tracking-wide text-text-secondary">
+                    Absorber (ABC)
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={config.abcEnabled ?? false}
+                    onChange={(e) => onConfigChange({ abcEnabled: e.target.checked })}
+                    className="w-5 h-5 accent-accent-primary cursor-pointer border border-border-default rounded-none"
+                  />
+                </div>
+                
+                {config.abcEnabled && (
+                  <>
+                    <div>
+                      <label className="block text-xs text-text-secondary mb-1">
+                        Absorber Width: {(config.abcWidth ?? 2.0).toFixed(1)}
+                      </label>
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="5.0"
+                        step="0.1"
+                        value={config.abcWidth ?? 2.0}
+                        onChange={(e) => onConfigChange({ abcWidth: parseFloat(e.target.value) })}
+                        className="w-full accent-text-primary h-6"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs text-text-secondary mb-1">
+                        Absorption Strength: {(config.abcStrength ?? 0.5).toFixed(2)}
+                      </label>
+                      <input
+                        type="range"
+                        min="0.05"
+                        max="2.0"
+                        step="0.05"
+                        value={config.abcStrength ?? 0.5}
+                        onChange={(e) => onConfigChange({ abcStrength: parseFloat(e.target.value) })}
+                        className="w-full accent-text-primary h-6"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           )}
         </section>
@@ -851,39 +921,14 @@ export function ControlPanel({
         </section>
         
         {/* Control Buttons */}
-        <section className="pt-6 border-t border-border-default space-y-2">
-          <button
-            onClick={isRunning ? onPause : onPlay}
-            className="w-full h-[48px] bg-accent-primary hover:bg-accent-dark text-surface-primary text-sm font-bold uppercase tracking-wide rounded-sm transition-fast flex items-center justify-center gap-2"
-          >
-            {isRunning ? (
-              <>
-                <Pause size={16} />
-                Pause
-              </>
-            ) : (
-              <>
-                <Play size={16} />
-                Play
-              </>
-            )}
-          </button>
-          
-          <button
-            onClick={onReset}
-            className="w-full h-[48px] bg-surface-primary border-2 border-text-primary hover:bg-surface-tertiary text-text-primary text-sm font-bold uppercase tracking-wide rounded-sm transition-fast flex items-center justify-center gap-2"
-          >
-            <RotateCcw size={16} />
-            Reset
-          </button>
-          
-          <div className="flex gap-2 pt-2">
+        <section className="pt-6 border-t border-border-default">
+          <div className="flex gap-2">
             <button
               onClick={onSave}
               className="flex-1 h-[48px] bg-surface-primary border-2 border-text-primary hover:bg-surface-tertiary text-text-primary text-sm font-bold uppercase tracking-wide rounded-sm transition-fast flex items-center justify-center gap-2"
             >
               <Download size={16} />
-              Save
+              Save State
             </button>
             
             <label className="flex-1">
@@ -895,7 +940,7 @@ export function ControlPanel({
               />
               <div className="h-[48px] bg-surface-primary border-2 border-text-primary hover:bg-surface-tertiary text-text-primary text-sm font-bold uppercase tracking-wide rounded-sm transition-fast flex items-center justify-center gap-2 cursor-pointer">
                 <Upload size={16} />
-                Load
+                Load State
               </div>
             </label>
           </div>

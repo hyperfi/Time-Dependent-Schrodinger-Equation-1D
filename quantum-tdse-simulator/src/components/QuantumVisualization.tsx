@@ -18,6 +18,8 @@ interface VisualizationProps {
   plotXMax: number;
   plotYMin: number;
   plotYMax: number;
+  potentialType: string;
+  onDrawPotential?: (newPotential: Float64Array) => void;
 }
 
 export function QuantumVisualization({
@@ -30,7 +32,9 @@ export function QuantumVisualization({
   plotXMin,
   plotXMax,
   plotYMin,
-  plotYMax
+  plotYMax,
+  potentialType,
+  onDrawPotential
 }: VisualizationProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sketchRef = useRef<p5 | null>(null);
@@ -46,7 +50,9 @@ export function QuantumVisualization({
     plotXMin,
     plotXMax,
     plotYMin,
-    plotYMax
+    plotYMax,
+    potentialType,
+    onDrawPotential
   });
   
   // Update refs when props change
@@ -61,9 +67,11 @@ export function QuantumVisualization({
       plotXMin,
       plotXMax,
       plotYMin,
-      plotYMax
+      plotYMax,
+      potentialType,
+      onDrawPotential
     };
-  }, [x, potential, state, isRunning, energy, totalProbability, plotXMin, plotXMax, plotYMin, plotYMax]);
+  }, [x, potential, state, isRunning, energy, totalProbability, plotXMin, plotXMax, plotYMin, plotYMax, potentialType, onDrawPotential]);
   
   useEffect(() => {
     if (!containerRef.current) return;
@@ -71,12 +79,39 @@ export function QuantumVisualization({
     const sketch = (p: p5) => {
       let canvas: p5.Renderer;
       
+      let wasPressed = false;
+      let isDrawing = false;
+      
       p.setup = () => {
         const width = containerRef.current!.clientWidth;
         const height = containerRef.current!.clientHeight;
         canvas = p.createCanvas(width, height);
         canvas.parent(containerRef.current!);
         p.frameRate(60);
+        
+        canvas.mousePressed(() => {
+          const margin = {
+            left: 60,
+            right: 40,
+            top: 60,
+            bottom: 60
+          };
+          const plotWidth = p.width - margin.left - margin.right;
+          const plotHeight = p.height - margin.top - margin.bottom;
+          const plotX = margin.left;
+          const plotY = margin.top;
+          
+          const px = p.mouseX;
+          const py = p.mouseY;
+          if (px >= plotX && px <= plotX + plotWidth && py >= plotY && py <= plotY + plotHeight) {
+            isDrawing = true;
+          }
+        });
+      };
+      
+      p.mouseReleased = () => {
+        isDrawing = false;
+        wasPressed = false;
       };
       
       p.windowResized = () => {
@@ -88,9 +123,104 @@ export function QuantumVisualization({
         }
       };
       
+      const handleDrawing = (p: p5) => {
+        const { x, potential, potentialType, onDrawPotential, plotXMin, plotXMax, plotYMin, plotYMax } = propsRef.current;
+        if (potentialType !== 'custom-draw' || x.length === 0 || !onDrawPotential) return;
+        
+        if (!isDrawing || !p.mouseIsPressed) {
+          isDrawing = false;
+          wasPressed = false;
+          return;
+        }
+        
+        const px2 = p.mouseX;
+        const py2 = p.mouseY;
+        
+        const px1Local = wasPressed ? p.pmouseX : px2;
+        const py1Local = wasPressed ? p.pmouseY : py2;
+        
+        wasPressed = true;
+        
+        const margin = {
+          left: 60,
+          right: 40,
+          top: 60,
+          bottom: 60
+        };
+        
+        const plotWidth = p.width - margin.left - margin.right;
+        const plotHeight = p.height - margin.top - margin.bottom;
+        const plotX = margin.left;
+        const plotY = margin.top;
+        
+        const inPlot = (px: number) => px >= plotX && px <= plotX + plotWidth;
+        
+        if (!inPlot(px2) && !inPlot(px1Local)) return;
+        
+        const newPotential = new Float64Array(potential);
+        const startPx = Math.max(plotX, Math.min(px1Local, px2));
+        const endPx = Math.min(plotX + plotWidth, Math.max(px1Local, px2));
+        
+        if (Math.abs(px2 - px1Local) < 1) {
+          const normX = (px2 - plotX) / plotWidth;
+          const worldX = plotXMin + normX * (plotXMax - plotXMin);
+          
+          const clampedY = Math.max(plotY, Math.min(plotY + plotHeight, py2));
+          const normY = (plotY + plotHeight - clampedY) / plotHeight;
+          const worldY = plotYMin + normY * (plotYMax - plotYMin);
+          
+          let closestIdx = 0;
+          let minDiff = Infinity;
+          for (let i = 0; i < x.length; i++) {
+            const diff = Math.abs(x[i] - worldX);
+            if (diff < minDiff) {
+              minDiff = diff;
+              closestIdx = i;
+            }
+          }
+          newPotential[closestIdx] = worldY;
+        } else {
+          for (let px = Math.floor(startPx); px <= Math.ceil(endPx); px++) {
+            const t = (px - px1Local) / (px2 - px1Local);
+            const py = py1Local + t * (py2 - py1Local);
+            
+            const normX = (px - plotX) / plotWidth;
+            const worldX = plotXMin + normX * (plotXMax - plotXMin);
+            
+            const clampedY = Math.max(plotY, Math.min(plotY + plotHeight, py));
+            const normY = (plotY + plotHeight - clampedY) / plotHeight;
+            const worldY = plotYMin + normY * (plotYMax - plotYMin);
+            
+            let closestIdx = 0;
+            let minDiff = Infinity;
+            for (let i = 0; i < x.length; i++) {
+              const diff = Math.abs(x[i] - worldX);
+              if (diff < minDiff) {
+                minDiff = diff;
+                closestIdx = i;
+              }
+            }
+            newPotential[closestIdx] = worldY;
+          }
+        }
+        
+        onDrawPotential(newPotential);
+      };
+
+      const isPotentialAllZero = (V: Float64Array) => {
+        for (let i = 0; i < V.length; i++) {
+          if (V[i] !== 0) return false;
+        }
+        return true;
+      };
+
       p.draw = () => {
         // Get current prop values from ref
-        const { x, potential, state, energy, totalProbability, plotXMin, plotXMax, plotYMin, plotYMax } = propsRef.current;
+        const { x, potential, state, plotXMin, plotXMax, plotYMin, plotYMax, potentialType } = propsRef.current;
+        
+        // Handle drawing if mouse is pressed
+        handleDrawing(p);
+
         // Clear background
         p.background(255); // #FFFFFF
         
@@ -136,17 +266,26 @@ export function QuantumVisualization({
         // Draw axes
         drawAxes(p, plotX, plotY, plotWidth, plotHeight, xMin, xMax, yMin, yMax, mapX, mapY);
         
+        // Draw visual instruction overlay if custom-draw is empty
+        if (potentialType === 'custom-draw' && isPotentialAllZero(potential)) {
+          p.fill(120, 120, 120, 150);
+          p.noStroke();
+          p.textAlign(p.CENTER, p.CENTER);
+          p.textSize(14);
+          p.text('Click & drag directly here to draw potential V(x)', plotX + plotWidth / 2, plotY + plotHeight / 2);
+        }
+
         // Draw potential (gray dashed line)
         p.stroke(102, 102, 102); // #666666
         p.strokeWeight(2);
-        p.drawingContext.setLineDash([4, 4]);
+        (p.drawingContext as any).setLineDash([4, 4]);
         p.noFill();
         p.beginShape();
         for (let i = 0; i < potential.length; i++) {
           p.vertex(mapX(x[i]), mapY(potential[i]));
         }
         p.endShape();
-        p.drawingContext.setLineDash([]);
+        (p.drawingContext as any).setLineDash([]);
         
         // Draw probability density (green filled area)
         p.fill(0, 170, 68, 100); // #00AA44 with transparency
@@ -182,9 +321,6 @@ export function QuantumVisualization({
         
         // Draw legend
         drawLegend(p, plotX, plotY);
-        
-        // Draw status
-        drawStatus(p, p.width - margin.right, plotY, state.time, energy, totalProbability);
       };
       
       function drawGrid(
@@ -202,7 +338,7 @@ export function QuantumVisualization({
       ) {
         p.stroke(221, 221, 221); // #DDDDDD
         p.strokeWeight(1);
-        p.drawingContext.setLineDash([2, 2]);
+        (p.drawingContext as any).setLineDash([2, 2]);
         
         // Vertical grid lines
         const xStep = (xMax - xMin) / 10;
@@ -220,7 +356,7 @@ export function QuantumVisualization({
           p.line(x, py, x + w, py);
         }
         
-        p.drawingContext.setLineDash([]);
+        (p.drawingContext as any).setLineDash([]);
       }
       
       function drawAxes(
@@ -309,9 +445,9 @@ export function QuantumVisualization({
           } else {
             p.stroke(item.color[0], item.color[1], item.color[2]);
             p.strokeWeight(2);
-            p.drawingContext.setLineDash([4, 4]);
+            (p.drawingContext as any).setLineDash([4, 4]);
             p.line(offsetX, y - 20, offsetX + 20, y - 20);
-            p.drawingContext.setLineDash([]);
+            (p.drawingContext as any).setLineDash([]);
           }
           
           // Draw label
@@ -323,31 +459,7 @@ export function QuantumVisualization({
         });
       }
       
-      function drawStatus(
-        p: p5,
-        x: number,
-        y: number,
-        time: number,
-        energy: number,
-        prob: number
-      ) {
-        // Background
-        p.fill(255, 255, 255, 242); // rgba(255, 255, 255, 0.95)
-        p.stroke(204, 204, 204); // #CCCCCC
-        p.strokeWeight(1);
-        p.rect(x - 160, y - 30, 150, 80, 0);
-        
-        // Text
-        p.noStroke();
-        p.fill(0); // #000000
-        p.textAlign(p.LEFT, p.TOP);
-        p.textSize(12);
-        p.textFont('SF Mono, Roboto Mono, Courier New, monospace');
-        
-        p.text(`t = ${time.toFixed(3)}`, x - 150, y - 20);
-        p.text(`E = ${energy.toFixed(3)}`, x - 150, y);
-        p.text(`∫|ψ|²dx = ${prob.toFixed(4)}`, x - 150, y + 20);
-      }
+      
       
       function drawPlaceholder(p: p5) {
         p.fill(102, 102, 102); // #666666

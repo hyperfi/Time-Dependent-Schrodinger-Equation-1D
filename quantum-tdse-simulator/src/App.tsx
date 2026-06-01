@@ -6,11 +6,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ControlPanel, SimulationConfig } from './components/ControlPanel';
 import { QuantumVisualization } from './components/QuantumVisualization';
-import { DrawingCanvas } from './components/DrawingCanvas';
 import { TDSESolver, WavefunctionState, createGaussianWavepacket, createPlaneWave, createBoundState, createCustomWavefunction } from './lib/tdse-solver';
 import { generatePotential, validatePotentialFunction } from './lib/potentials';
 import { validateWavefunctionFunctions } from './lib/wavefunctions';
-import { Settings, X } from 'lucide-react';
+import { Settings, X, Play, Pause, RotateCcw, AlertTriangle } from 'lucide-react';
 import JSZip from 'jszip';
 import './App.css';
 
@@ -40,7 +39,10 @@ const DEFAULT_CONFIG: SimulationConfig = {
   plotXMin: -10,
   plotXMax: 10,
   plotYMin: -3,
-  plotYMax: 3
+  plotYMax: 3,
+  abcEnabled: true,
+  abcWidth: 2,
+  abcStrength: 0.5
 };
 
 function App() {
@@ -57,6 +59,7 @@ function App() {
   const [recordingProgress, setRecordingProgress] = useState(0);
   const [isExportingZip, setIsExportingZip] = useState(false);
   const [zipProgress, setZipProgress] = useState(0);
+  const [showBoundaryModal, setShowBoundaryModal] = useState(false);
   
   // Panel resize and visibility state
   const [isPanelVisible, setIsPanelVisible] = useState(true);
@@ -141,21 +144,16 @@ function App() {
     setIsPanelVisible(!isPanelVisible);
   };
   
-  // Initialize solver when config changes
+  // 1. Structural Initialization: Recreates solver & wavefunction
   useEffect(() => {
     try {
-      // Validate custom potential function if applicable
-      if (config.potentialType === 'custom-function') {
-        const validation = validatePotentialFunction(config.customPotentialFunction, config.potentialParameters || {});
-        if (!validation.valid) {
-          console.error('Invalid potential function:', validation.error);
-          return;
-        }
-      }
-      
       // Validate custom wavefunction function if applicable
       if (config.wavefunctionType === 'custom-function') {
-        const validation = validateWavefunctionFunctions(config.wavefunctionRealExpr, config.wavefunctionImagExpr, config.wavefunctionParameters || {});
+        const validation = validateWavefunctionFunctions(
+          config.wavefunctionRealExpr,
+          config.wavefunctionImagExpr,
+          config.wavefunctionParameters || {}
+        );
         if (!validation.valid) {
           console.error('Invalid wavefunction function:', validation.error);
           return;
@@ -169,10 +167,13 @@ function App() {
         xMax: config.xMax,
         dt: config.dt,
         hbar: 1,
-        mass: 1
+        mass: 1,
+        abcEnabled: config.abcEnabled,
+        abcWidth: config.abcWidth,
+        abcStrength: config.abcStrength
       });
       
-      // Generate potential
+      // Generate current potential (using current configs & drawn points)
       const newPotential = generatePotential(newSolver.x, {
         type: config.potentialType,
         v0: config.potentialV0,
@@ -184,12 +185,10 @@ function App() {
       }, 1, config.potentialParameters || {});
       
       newSolver.setPotential(newPotential);
-      // Create immutable copy of potential for visualization
       setPotential(new Float64Array(newPotential));
       
-      // Create initial wavefunction based on type
+      // Create initial wavefunction
       let initialState: WavefunctionState;
-      
       switch (config.wavefunctionType) {
         case 'gaussian':
           initialState = createGaussianWavepacket(
@@ -199,7 +198,6 @@ function App() {
             config.wavefunctionK0
           );
           break;
-          
         case 'plane-wave':
           initialState = createPlaneWave(
             newSolver,
@@ -207,7 +205,6 @@ function App() {
             config.wavefunctionK0
           );
           break;
-          
         case 'bound-state':
           initialState = createBoundState(
             newSolver,
@@ -215,7 +212,6 @@ function App() {
             config.wavefunctionWellWidth
           );
           break;
-          
         case 'custom-function':
           initialState = createCustomWavefunction(
             newSolver,
@@ -224,9 +220,7 @@ function App() {
             config.wavefunctionParameters || {}
           );
           break;
-          
         default:
-          // Fallback to Gaussian
           initialState = createGaussianWavepacket(
             newSolver,
             config.wavefunctionX0,
@@ -236,7 +230,6 @@ function App() {
       }
       
       setSolver(newSolver);
-      // Create initial state with copied arrays
       const newState = {
         real: new Float64Array(initialState.real),
         imag: new Float64Array(initialState.imag),
@@ -244,22 +237,18 @@ function App() {
       };
       setState(newState);
       
-      // Calculate initial energy and probability
       setEnergy(newSolver.getEnergy(initialState));
       setTotalProbability(newSolver.getTotalProbability(initialState));
       
       boundaryWarningShownRef.current = false;
     } catch (error) {
-      console.error('Error initializing simulation:', error);
+      console.error('Error initializing solver structure:', error);
     }
   }, [
-    config.potentialType,
-    config.potentialV0,
-    config.potentialX0,
-    config.potentialWidth,
-    config.potentialOmega,
-    config.customPotentialFunction,
-    config.potentialParameters,
+    config.gridSize,
+    config.xMin,
+    config.xMax,
+    config.dt,
     config.wavefunctionType,
     config.wavefunctionX0,
     config.wavefunctionSigma,
@@ -269,12 +258,61 @@ function App() {
     config.wavefunctionWellWidth,
     config.wavefunctionRealExpr,
     config.wavefunctionImagExpr,
-    config.wavefunctionParameters,
-    config.gridSize,
-    config.xMin,
-    config.xMax,
-    config.dt,
-    drawnPotentialVersion
+    config.wavefunctionParameters
+  ]);
+
+  // 2. Hot-Reload: Updates potential, ABC, & energy in real-time
+  useEffect(() => {
+    if (!solver) return;
+    try {
+      // Validate custom potential if applicable
+      if (config.potentialType === 'custom-function') {
+        const validation = validatePotentialFunction(
+          config.customPotentialFunction,
+          config.potentialParameters || {}
+        );
+        if (!validation.valid) return;
+      }
+      
+      // Update potential on solver
+      const newPotential = generatePotential(solver.x, {
+        type: config.potentialType,
+        v0: config.potentialV0,
+        x0: config.potentialX0,
+        width: config.potentialWidth,
+        omega: config.potentialOmega,
+        customFunction: config.customPotentialFunction,
+        customPoints: drawnPoints
+      }, 1, config.potentialParameters || {});
+      
+      solver.setPotential(newPotential);
+      setPotential(new Float64Array(newPotential));
+      
+      // Update ABC dynamically
+      solver.setABC(config.abcEnabled ?? false, config.abcWidth ?? 2, config.abcStrength ?? 0.5);
+      
+      // Recalculate energy using the current running wavefunction state if available
+      const currentState = stateRef.current;
+      if (currentState) {
+        setEnergy(solver.getEnergy(currentState));
+      }
+    } catch (error) {
+      console.error('Error updating potential dynamically:', error);
+    }
+  }, [
+    solver,
+    config.potentialType,
+    config.potentialV0,
+    config.potentialX0,
+    config.potentialWidth,
+    config.potentialOmega,
+    config.customPotentialFunction,
+    config.potentialParameters,
+    drawnPoints,
+    drawnPotentialVersion,
+    config.abcEnabled,
+    config.abcWidth,
+    config.abcStrength
   ]);
   
   // Animation loop
@@ -301,16 +339,16 @@ function App() {
     setEnergy(newEnergy);
     setTotalProbability(newProb);
     
-    // Check boundaries
-    if (!boundaryWarningShownRef.current && solver.checkBoundaries(currentState)) {
+    // Check boundaries (skip if ABC is active)
+    if (!config.abcEnabled && !boundaryWarningShownRef.current && solver.checkBoundaries(currentState)) {
       boundaryWarningShownRef.current = true;
       setIsRunning(false);
-      alert('Wavepacket reached boundary! Simulation paused to prevent artifacts.');
+      setShowBoundaryModal(true);
       return;
     }
     
     animationFrameRef.current = requestAnimationFrame(animate);
-  }, [solver, config.stepsPerFrame]);
+  }, [solver, config.stepsPerFrame, config.abcEnabled]);
   
   // Start/stop animation
   useEffect(() => {
@@ -352,12 +390,47 @@ function App() {
     
     // Recreate initial state
     if (solver) {
-      const initialState = createGaussianWavepacket(
-        solver,
-        config.wavefunctionX0,
-        config.wavefunctionSigma,
-        config.wavefunctionK0
-      );
+      let initialState: WavefunctionState;
+      
+      switch (config.wavefunctionType) {
+        case 'gaussian':
+          initialState = createGaussianWavepacket(
+            solver,
+            config.wavefunctionX0,
+            config.wavefunctionSigma,
+            config.wavefunctionK0
+          );
+          break;
+        case 'plane-wave':
+          initialState = createPlaneWave(
+            solver,
+            config.wavefunctionAmplitude,
+            config.wavefunctionK0
+          );
+          break;
+        case 'bound-state':
+          initialState = createBoundState(
+            solver,
+            config.wavefunctionQuantumNumber,
+            config.wavefunctionWellWidth
+          );
+          break;
+        case 'custom-function':
+          initialState = createCustomWavefunction(
+            solver,
+            config.wavefunctionRealExpr,
+            config.wavefunctionImagExpr,
+            config.wavefunctionParameters || {}
+          );
+          break;
+        default:
+          initialState = createGaussianWavepacket(
+            solver,
+            config.wavefunctionX0,
+            config.wavefunctionSigma,
+            config.wavefunctionK0
+          );
+      }
       
       // Update state with new object
       setState({
@@ -371,9 +444,61 @@ function App() {
     }
   };
   
+  const handleDrawPotential = (newPotential: Float64Array) => {
+    if (!solver) return;
+    
+    // Update local state and solver immediately
+    setPotential(new Float64Array(newPotential));
+    solver.setPotential(newPotential);
+    
+    // Save points as coordinate pairs for configuration/exports
+    const points: { x: number; y: number }[] = [];
+    for (let i = 0; i < newPotential.length; i++) {
+      points.push({ x: solver.x[i], y: newPotential[i] });
+    }
+    setDrawnPoints(points);
+    
+    // Re-calculate energy on the fly
+    const currentState = stateRef.current;
+    if (currentState) {
+      setEnergy(solver.getEnergy(currentState));
+    }
+  };
+  
   const handleApplyDrawing = (points: { x: number; y: number }[]) => {
     setDrawnPoints(points);
     setDrawnPotentialVersion(v => v + 1); // Increment version to trigger re-initialization
+  };
+  
+  const handleClearDrawnPotential = () => {
+    if (solver) {
+      const zeroV = new Float64Array(solver.x.length);
+      solver.setPotential(zeroV);
+      setPotential(zeroV);
+      setDrawnPoints([]);
+      setDrawnPotentialVersion(v => v + 1);
+      const currentState = stateRef.current;
+      if (currentState) {
+        setEnergy(solver.getEnergy(currentState));
+      }
+    }
+  };
+  
+  const handleDismissModal = () => {
+    setShowBoundaryModal(false);
+  };
+
+  const handleEnableAbcAndContinue = () => {
+    setShowBoundaryModal(false);
+    
+    // Dynamically apply ABC directly to the solver
+    if (solver) {
+      solver.setABC(true, config.abcWidth ?? 2, config.abcStrength ?? 0.5);
+    }
+    
+    // Update config and continue simulation
+    setConfig(prev => ({ ...prev, abcEnabled: true }));
+    setIsRunning(true);
   };
   
   const handleSave = () => {
@@ -844,6 +969,7 @@ function App() {
             onDownloadCurrentFrame={handleDownloadCurrentFrame}
             onDownloadVideo={handleDownloadVideo}
             onDownloadFramesAsZip={handleDownloadFramesAsZip}
+            onClearDrawnPotential={handleClearDrawnPotential}
             isRecording={isRecording}
             recordingProgress={recordingProgress}
             isExportingZip={isExportingZip}
@@ -880,18 +1006,9 @@ function App() {
       </button>
       
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Drawing Canvas (conditionally shown) */}
-        {config.potentialType === 'custom-draw' && (
-          <DrawingCanvas
-            xMin={config.xMin}
-            xMax={config.xMax}
-            onApply={handleApplyDrawing}
-          />
-        )}
-        
+      <div className="flex-1 flex flex-col overflow-hidden relative">
         {/* Visualization Canvas */}
-        <div className={`flex-1 relative ${config.potentialType === 'custom-draw' ? 'h-[60%]' : 'h-full'}`}>
+        <div className="flex-1 relative h-full w-full">
           {solver && (
             <QuantumVisualization
               x={solver.x}
@@ -904,10 +1021,111 @@ function App() {
               plotXMax={config.plotXMax}
               plotYMin={config.plotYMin}
               plotYMax={config.plotYMax}
+              potentialType={config.potentialType}
+              onDrawPotential={handleDrawPotential}
             />
+          )}
+
+          {/* Central Play Overlay */}
+          {!isRunning && state && state.time === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/5 z-20 pointer-events-none">
+              <button
+                onClick={handlePlay}
+                className="w-24 h-24 bg-accent-primary hover:bg-accent-dark text-white rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 transform hover:scale-110 active:scale-95 pointer-events-auto"
+                title="Start Simulation"
+              >
+                <Play size={36} className="ml-1.5 fill-white text-white" />
+              </button>
+            </div>
+          )}
+
+          {/* Floating Bottom Control Bar */}
+          {(isRunning || (state && state.time > 0)) && (
+            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-surface-primary/85 backdrop-blur-md border-2 border-text-primary shadow-minimal p-3 px-6 rounded-none flex items-center gap-6 z-30 transition-all animate-in fade-in slide-in-from-bottom-4 duration-200">
+              <button
+                onClick={isRunning ? handlePause : handlePlay}
+                className={`w-12 h-12 flex items-center justify-center rounded-none transition-fast text-white ${
+                  isRunning ? 'bg-text-secondary hover:bg-text-primary' : 'bg-accent-primary hover:bg-accent-dark'
+                }`}
+                title={isRunning ? 'Pause' : 'Play'}
+              >
+                {isRunning ? <Pause size={18} className="fill-white text-white" /> : <Play size={18} className="fill-white text-white ml-0.5" />}
+              </button>
+              
+              <button
+                onClick={handleReset}
+                className="w-10 h-10 border border-border-default bg-surface-primary hover:bg-surface-tertiary text-text-primary rounded-none flex items-center justify-center transition-fast"
+                title="Reset Simulation"
+              >
+                <RotateCcw size={16} />
+              </button>
+              
+              <div className="h-6 w-px bg-border-default" />
+              
+              {/* Stats Dashboard */}
+              <div className="flex items-center gap-6 text-sm font-mono font-medium text-text-secondary">
+                <div>
+                  <span className="text-text-tertiary mr-1.5 uppercase text-[10px] tracking-wider font-sans font-bold">Time</span>
+                  <span className="text-text-primary text-sm font-mono font-bold">t = {(state?.time ?? 0).toFixed(3)}</span>
+                </div>
+                
+                <div>
+                  <span className="text-text-tertiary mr-1.5 uppercase text-[10px] tracking-wider font-sans font-bold">Energy</span>
+                  <span className="text-text-primary text-sm font-mono font-bold">E = {energy.toFixed(3)}</span>
+                </div>
+                
+                <div>
+                  <span className="text-text-tertiary mr-1.5 uppercase text-[10px] tracking-wider font-sans font-bold">Norm</span>
+                  <span className={`text-sm font-mono font-bold ${totalProbability < 0.995 ? 'text-red-600 font-extrabold' : 'text-text-primary'}`}>
+                    ∫|ψ|² = {totalProbability.toFixed(4)}
+                  </span>
+                </div>
+  
+                {config.abcEnabled && (
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 bg-green-50 text-green-700 border border-green-200 rounded-none text-[10px] font-sans font-bold uppercase tracking-wider">
+                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                    ABC Active
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </div>
       </div>
+
+      {/* Elegant Swiss-Design Modal Overlay */}
+      {showBoundaryModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-50 animate-in fade-in duration-200">
+          <div className="bg-surface-primary border-2 border-text-primary p-6 md:p-8 max-w-md w-full shadow-minimal rounded-none relative">
+            <div className="flex items-center gap-3 mb-4">
+              <AlertTriangle className="text-viz-imaginary" size={24} />
+              <h3 className="text-lg font-bold uppercase tracking-wider text-text-primary font-sans">
+                Boundary Interference
+              </h3>
+            </div>
+            <p className="text-sm text-text-secondary leading-relaxed mb-4 font-sans">
+              The wavepacket has reached the grid boundary. To prevent non-physical boundary reflections, the simulation has been paused.
+            </p>
+            <p className="text-sm text-text-tertiary leading-relaxed mb-6 font-sans">
+              Would you like to enable <strong>Absorbing Boundary Conditions (ABC)</strong> to smoothly absorb the wavefunction amplitude at the boundary edges and continue?
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={handleEnableAbcAndContinue}
+                className="flex-1 h-12 bg-accent-primary hover:bg-accent-dark text-white text-xs font-bold uppercase tracking-widest rounded-none transition-fast"
+              >
+                Enable ABC & Continue
+              </button>
+              <button
+                onClick={handleDismissModal}
+                className="h-12 px-6 border border-border-default hover:bg-surface-secondary text-text-secondary text-xs font-bold uppercase tracking-widest rounded-none transition-fast"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
