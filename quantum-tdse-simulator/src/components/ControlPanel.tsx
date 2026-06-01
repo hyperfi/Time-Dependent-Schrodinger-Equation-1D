@@ -186,7 +186,7 @@ export function ControlPanel({
           
           <select
             value={config.potentialType}
-            onChange={(e) => onConfigChange({ potentialType: e.target.value as PotentialType })}
+            onChange={(e) => onConfigChange({ potentialType: e.target.value as PotentialType }, true)}
             className="w-full h-[48px] px-4 bg-surface-primary border border-border-default rounded-none text-base font-regular focus:outline-none focus:border-2 focus:border-border-focus transition-fast"
           >
             {Object.entries(PRESET_POTENTIALS).map(([key, preset]) => (
@@ -366,8 +366,8 @@ export function ControlPanel({
           
           <select
             value={config.wavefunctionType}
-            onChange={(e) => onConfigChange({ wavefunctionType: e.target.value as WavefunctionType })}
-            className="w-full h-[48px] px-4 bg-surface-primary border border-border-default rounded-none text-base font-regular focus:outline-none focus:border-2 focus:border-border-focus"
+            onChange={(e) => onConfigChange({ wavefunctionType: e.target.value as WavefunctionType }, true)}
+            className="w-full h-[48px] px-4 bg-surface-primary border border-border-default rounded-none text-base font-regular focus:outline-none focus:border-2 focus:border-border-focus transition-fast"
             disabled={isRunning}
           >
             {Object.entries(PRESET_WAVEFUNCTIONS).map(([key, preset]) => (

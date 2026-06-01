@@ -533,6 +533,13 @@ function App() {
     }
   };
 
+  const handlePreviewEigenstate = (index: number | null) => {
+    setPreviewEigenstateIndex(index);
+    if (index !== null) {
+      setMobileTab('simulation');
+    }
+  };
+
   const handleLoadEigenstate = (index: number) => {
     if (!solver || index < 0 || index >= eigenstates.length) return;
     
@@ -1050,7 +1057,7 @@ function App() {
             eigenstates={eigenstates}
             previewEigenstateIndex={previewEigenstateIndex}
             onComputeEigenstates={handleComputeEigenstates}
-            onPreviewEigenstate={setPreviewEigenstateIndex}
+            onPreviewEigenstate={handlePreviewEigenstate}
             onLoadEigenstate={handleLoadEigenstate}
           />
         </div>
@@ -1301,7 +1308,7 @@ function App() {
             eigenstates={eigenstates}
             previewEigenstateIndex={previewEigenstateIndex}
             onComputeEigenstates={handleComputeEigenstates}
-            onPreviewEigenstate={setPreviewEigenstateIndex}
+            onPreviewEigenstate={handlePreviewEigenstate}
             onLoadEigenstate={handleLoadEigenstate}
             activeTab={mobileTab === 'parameters' ? 'parameters' : 'presets'}
             onTabChange={(tab) => setMobileTab(tab === 'parameters' ? 'parameters' : 'presets')}
