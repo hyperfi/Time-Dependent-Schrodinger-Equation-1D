@@ -541,7 +541,7 @@ export function QuantumVisualization({
     <div 
       ref={containerRef} 
       className="w-full h-full bg-surface-primary"
-      style={{ minHeight: '400px' }}
+      style={{ minHeight: '400px', touchAction: 'none' }}
     />
   );
 }

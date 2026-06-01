@@ -55,7 +55,7 @@ export interface SimulationConfig {
 interface ControlPanelProps {
   config: SimulationConfig;
   isRunning: boolean;
-  onConfigChange: (config: Partial<SimulationConfig>) => void;
+  onConfigChange: (config: Partial<SimulationConfig>, shouldSwitchTab?: boolean) => void;
   onPlay: () => void;
   onPause: () => void;
   onReset: () => void;
@@ -74,6 +74,8 @@ interface ControlPanelProps {
   onComputeEigenstates?: () => void;
   onPreviewEigenstate?: (index: number | null) => void;
   onLoadEigenstate?: (index: number) => void;
+  activeTab?: 'parameters' | 'presets';
+  onTabChange?: (tab: 'parameters' | 'presets') => void;
 }
 
 export function ControlPanel({
@@ -97,10 +99,16 @@ export function ControlPanel({
   previewEigenstateIndex = null,
   onComputeEigenstates,
   onPreviewEigenstate,
-  onLoadEigenstate
+  onLoadEigenstate,
+  activeTab: propActiveTab,
+  onTabChange: propOnTabChange
 }: ControlPanelProps) {
+  const numValue = (val: number | undefined | null) => (val === undefined || val === null || isNaN(val)) ? '' : val;
+
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [activeTab, setActiveTab] = useState<'parameters' | 'presets'>('parameters');
+  const [localActiveTab, setLocalActiveTab] = useState<'parameters' | 'presets'>('parameters');
+  const activeTab = propActiveTab !== undefined ? propActiveTab : localActiveTab;
+  const setActiveTab = propOnTabChange !== undefined ? propOnTabChange : setLocalActiveTab;
   const [videoFormat, setVideoFormat] = useState('mp4');
   const [frameRate, setFrameRate] = useState(30);
   const [frameRateError, setFrameRateError] = useState('');
@@ -143,7 +151,7 @@ export function ControlPanel({
         </div>
         
         {/* Tabs */}
-        <div className="flex border-b border-border-default mb-6 font-sans">
+        <div className="hidden md:flex border-b border-border-default mb-6 font-sans">
           <button
             type="button"
             onClick={() => setActiveTab('parameters')}
@@ -214,7 +222,7 @@ export function ControlPanel({
                 </label>
                 <input
                   type="number"
-                  value={config.potentialV0}
+                  value={numValue(config.potentialV0)}
                   onChange={(e) => onConfigChange({ potentialV0: parseFloat(e.target.value) })}
                   step="0.5"
                   className="w-full h-[48px] px-4 bg-surface-primary border border-border-default rounded-none text-base font-mono focus:outline-none focus:border-2 focus:border-border-focus"
@@ -227,7 +235,7 @@ export function ControlPanel({
                 </label>
                 <input
                   type="number"
-                  value={config.potentialX0}
+                  value={numValue(config.potentialX0)}
                   onChange={(e) => onConfigChange({ potentialX0: parseFloat(e.target.value) })}
                   step="0.5"
                   className="w-full h-[48px] px-4 bg-surface-primary border border-border-default rounded-none text-base font-mono focus:outline-none focus:border-2 focus:border-border-focus"
@@ -240,7 +248,7 @@ export function ControlPanel({
                 </label>
                 <input
                   type="number"
-                  value={config.potentialWidth}
+                  value={numValue(config.potentialWidth)}
                   onChange={(e) => onConfigChange({ potentialWidth: parseFloat(e.target.value) })}
                   step="0.5"
                   min="0.1"
@@ -258,7 +266,7 @@ export function ControlPanel({
                 </label>
                 <input
                   type="number"
-                  value={config.potentialOmega}
+                  value={numValue(config.potentialOmega)}
                   onChange={(e) => onConfigChange({ potentialOmega: parseFloat(e.target.value) })}
                   step="0.1"
                   min="0.1"
@@ -272,7 +280,7 @@ export function ControlPanel({
                 </label>
                 <input
                   type="number"
-                  value={config.potentialX0}
+                  value={numValue(config.potentialX0)}
                   onChange={(e) => onConfigChange({ potentialX0: parseFloat(e.target.value) })}
                   step="0.5"
                   className="w-full h-[48px] px-4 bg-surface-primary border border-border-default rounded-none text-base font-mono focus:outline-none focus:border-2 focus:border-border-focus"
@@ -378,7 +386,7 @@ export function ControlPanel({
                 </label>
                 <input
                   type="number"
-                  value={config.wavefunctionX0}
+                  value={numValue(config.wavefunctionX0)}
                   onChange={(e) => onConfigChange({ wavefunctionX0: parseFloat(e.target.value) })}
                   step="0.5"
                   className="w-full h-[48px] px-4 bg-surface-primary border border-border-default rounded-none text-base font-mono focus:outline-none focus:border-2 focus:border-border-focus"
@@ -392,7 +400,7 @@ export function ControlPanel({
                 </label>
                 <input
                   type="number"
-                  value={config.wavefunctionSigma}
+                  value={numValue(config.wavefunctionSigma)}
                   onChange={(e) => onConfigChange({ wavefunctionSigma: parseFloat(e.target.value) })}
                   step="0.1"
                   min="0.1"
@@ -407,7 +415,7 @@ export function ControlPanel({
                 </label>
                 <input
                   type="number"
-                  value={config.wavefunctionK0}
+                  value={numValue(config.wavefunctionK0)}
                   onChange={(e) => onConfigChange({ wavefunctionK0: parseFloat(e.target.value) })}
                   step="0.5"
                   className="w-full h-[48px] px-4 bg-surface-primary border border-border-default rounded-none text-base font-mono focus:outline-none focus:border-2 focus:border-border-focus"
@@ -425,7 +433,7 @@ export function ControlPanel({
                 </label>
                 <input
                   type="number"
-                  value={config.wavefunctionAmplitude}
+                  value={numValue(config.wavefunctionAmplitude)}
                   onChange={(e) => onConfigChange({ wavefunctionAmplitude: parseFloat(e.target.value) })}
                   step="0.1"
                   min="0.1"
@@ -440,7 +448,7 @@ export function ControlPanel({
                 </label>
                 <input
                   type="number"
-                  value={config.wavefunctionK0}
+                  value={numValue(config.wavefunctionK0)}
                   onChange={(e) => onConfigChange({ wavefunctionK0: parseFloat(e.target.value) })}
                   step="0.5"
                   className="w-full h-[48px] px-4 bg-surface-primary border border-border-default rounded-none text-base font-mono focus:outline-none focus:border-2 focus:border-border-focus"
@@ -458,7 +466,7 @@ export function ControlPanel({
                 </label>
                 <input
                   type="number"
-                  value={config.wavefunctionQuantumNumber}
+                  value={numValue(config.wavefunctionQuantumNumber)}
                   onChange={(e) => onConfigChange({ wavefunctionQuantumNumber: parseInt(e.target.value) })}
                   step="1"
                   min="1"
@@ -473,7 +481,7 @@ export function ControlPanel({
                 </label>
                 <input
                   type="number"
-                  value={config.wavefunctionWellWidth}
+                  value={numValue(config.wavefunctionWellWidth)}
                   onChange={(e) => onConfigChange({ wavefunctionWellWidth: parseFloat(e.target.value) })}
                   step="0.5"
                   min="1"
@@ -701,14 +709,14 @@ export function ControlPanel({
                 <div className="flex gap-2">
                   <input
                     type="number"
-                    value={config.xMin}
+                    value={numValue(config.xMin)}
                     onChange={(e) => onConfigChange({ xMin: parseFloat(e.target.value) })}
                     placeholder="xMin"
                     className="w-1/2 h-[48px] px-4 bg-surface-primary border border-border-default rounded-none text-base font-mono focus:outline-none focus:border-2 focus:border-border-focus"
                   />
                   <input
                     type="number"
-                    value={config.xMax}
+                    value={numValue(config.xMax)}
                     onChange={(e) => onConfigChange({ xMax: parseFloat(e.target.value) })}
                     placeholder="xMax"
                     className="w-1/2 h-[48px] px-4 bg-surface-primary border border-border-default rounded-none text-base font-mono focus:outline-none focus:border-2 focus:border-border-focus"
@@ -722,7 +730,7 @@ export function ControlPanel({
                 </label>
                 <input
                   type="number"
-                  value={config.dt}
+                  value={numValue(config.dt)}
                   onChange={(e) => onConfigChange({ dt: parseFloat(e.target.value) })}
                   step="0.001"
                   min="0.001"
@@ -736,7 +744,7 @@ export function ControlPanel({
                 </label>
                 <input
                   type="number"
-                  value={config.stepsPerFrame}
+                  value={numValue(config.stepsPerFrame)}
                   onChange={(e) => onConfigChange({ stepsPerFrame: parseInt(e.target.value) })}
                   min="1"
                   max="10"
@@ -971,10 +979,10 @@ export function ControlPanel({
                 </label>
                 <input
                   type="number"
-                  value={config.plotXMin}
+                  value={numValue(config.plotXMin)}
                   onChange={(e) => {
                     const newXMin = parseFloat(e.target.value);
-                    if (newXMin < config.plotXMax) {
+                    if (isNaN(newXMin) || newXMin < config.plotXMax) {
                       onConfigChange({ plotXMin: newXMin });
                     }
                   }}
@@ -989,10 +997,10 @@ export function ControlPanel({
                 </label>
                 <input
                   type="number"
-                  value={config.plotXMax}
+                  value={numValue(config.plotXMax)}
                   onChange={(e) => {
                     const newXMax = parseFloat(e.target.value);
-                    if (newXMax > config.plotXMin) {
+                    if (isNaN(newXMax) || newXMax > config.plotXMin) {
                       onConfigChange({ plotXMax: newXMax });
                     }
                   }}
@@ -1009,10 +1017,10 @@ export function ControlPanel({
                 </label>
                 <input
                   type="number"
-                  value={config.plotYMin}
+                  value={numValue(config.plotYMin)}
                   onChange={(e) => {
                     const newYMin = parseFloat(e.target.value);
-                    if (newYMin < config.plotYMax) {
+                    if (isNaN(newYMin) || newYMin < config.plotYMax) {
                       onConfigChange({ plotYMin: newYMin });
                     }
                   }}
@@ -1027,10 +1035,10 @@ export function ControlPanel({
                 </label>
                 <input
                   type="number"
-                  value={config.plotYMax}
+                  value={numValue(config.plotYMax)}
                   onChange={(e) => {
                     const newYMax = parseFloat(e.target.value);
-                    if (newYMax > config.plotYMin) {
+                    if (isNaN(newYMax) || newYMax > config.plotYMin) {
                       onConfigChange({ plotYMax: newYMax });
                     }
                   }}
@@ -1092,7 +1100,7 @@ export function ControlPanel({
                     wavefunctionSigma: 1,
                     wavefunctionK0: 0,
                     abcEnabled: false
-                  });
+                  }, true);
                 }}
                 className="mt-2 w-full h-[36px] bg-accent-primary hover:bg-accent-dark text-white text-xs font-bold uppercase tracking-wide rounded-none transition-fast flex items-center justify-center animate-in fade-in"
               >
@@ -1123,7 +1131,7 @@ export function ControlPanel({
                     abcEnabled: true,
                     abcWidth: 2,
                     abcStrength: 0.5
-                  });
+                  }, true);
                 }}
                 className="mt-2 w-full h-[36px] bg-accent-primary hover:bg-accent-dark text-white text-xs font-bold uppercase tracking-wide rounded-none transition-fast flex items-center justify-center"
               >
@@ -1151,7 +1159,7 @@ export function ControlPanel({
                     wavefunctionSigma: 1,
                     wavefunctionK0: 0,
                     abcEnabled: false
-                  });
+                  }, true);
                 }}
                 className="mt-2 w-full h-[36px] bg-accent-primary hover:bg-accent-dark text-white text-xs font-bold uppercase tracking-wide rounded-none transition-fast flex items-center justify-center"
               >
@@ -1178,7 +1186,7 @@ export function ControlPanel({
                     wavefunctionSigma: 0.7,
                     wavefunctionK0: 0,
                     abcEnabled: false
-                  });
+                  }, true);
                 }}
                 className="mt-2 w-full h-[36px] bg-accent-primary hover:bg-accent-dark text-white text-xs font-bold uppercase tracking-wide rounded-none transition-fast flex items-center justify-center"
               >

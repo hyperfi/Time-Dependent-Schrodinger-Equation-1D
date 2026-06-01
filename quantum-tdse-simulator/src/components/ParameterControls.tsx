@@ -24,6 +24,7 @@ export function ParameterControls({
 }: ParameterControlsProps) {
   const [newParamName, setNewParamName] = useState('');
   const [newParamValue, setNewParamValue] = useState(1);
+  const numValue = (val: number | undefined | null) => (val === undefined || val === null || isNaN(val)) ? '' : val;
   const [showAddForm, setShowAddForm] = useState(false);
   const [error, setError] = useState('');
 
@@ -146,7 +147,7 @@ export function ParameterControls({
               </label>
               <input
                 type="number"
-                value={newParamValue}
+                value={numValue(newParamValue)}
                 onChange={(e) => setNewParamValue(parseFloat(e.target.value) || 0)}
                 step="0.1"
                 className="w-full h-8 px-2 bg-surface-primary border border-border-default rounded text-sm font-mono focus:outline-none focus:border-2 focus:border-border-focus"
@@ -237,7 +238,7 @@ export function ParameterControls({
                   <label className="block text-xs text-text-secondary mb-1">Min</label>
                   <input
                     type="number"
-                    value={param.min}
+                    value={numValue(param.min)}
                     onChange={(e) => handleParameterRangeUpdate(param.name, 'min', parseFloat(e.target.value))}
                     step={param.step}
                     className="w-full h-8 px-2 bg-surface-primary border border-border-default rounded text-xs font-mono focus:outline-none focus:border-2 focus:border-border-focus"
@@ -249,7 +250,7 @@ export function ParameterControls({
                   <label className="block text-xs text-text-secondary mb-1">Step</label>
                   <input
                     type="number"
-                    value={param.step}
+                    value={numValue(param.step)}
                     onChange={(e) => handleParameterRangeUpdate(param.name, 'step', Math.max(0.001, parseFloat(e.target.value)))}
                     step="0.001"
                     min="0.001"
@@ -262,7 +263,7 @@ export function ParameterControls({
                   <label className="block text-xs text-text-secondary mb-1">Max</label>
                   <input
                     type="number"
-                    value={param.max}
+                    value={numValue(param.max)}
                     onChange={(e) => handleParameterRangeUpdate(param.name, 'max', parseFloat(e.target.value))}
                     step={param.step}
                     className="w-full h-8 px-2 bg-surface-primary border border-border-default rounded text-xs font-mono focus:outline-none focus:border-2 focus:border-border-focus"
@@ -276,7 +277,7 @@ export function ParameterControls({
                 <label className="block text-xs text-text-secondary mb-1">Precise Value</label>
                 <input
                   type="number"
-                  value={param.value}
+                  value={numValue(param.value)}
                   onChange={(e) => handleParameterUpdate(param.name, parseFloat(e.target.value))}
                   step={param.step}
                   min={param.min}
