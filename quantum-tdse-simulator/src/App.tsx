@@ -9,7 +9,7 @@ import { QuantumVisualization } from './components/QuantumVisualization';
 import { TDSESolver, WavefunctionState, createGaussianWavepacket, createPlaneWave, createBoundState, createCustomWavefunction } from './lib/tdse-solver';
 import { generatePotential, validatePotentialFunction } from './lib/potentials';
 import { validateWavefunctionFunctions } from './lib/wavefunctions';
-import { Settings, X, Play, Pause, RotateCcw, AlertTriangle, Activity, Sliders, BookOpen } from 'lucide-react';
+import { Settings, X, Play, Pause, RotateCcw, AlertTriangle, Activity, Sliders, BookOpen, Trash2 } from 'lucide-react';
 import JSZip from 'jszip';
 import './App.css';
 
@@ -1182,23 +1182,35 @@ function App() {
         {/* Mobile Quick Dashboard - Only visible on mobile under the canvas */}
         <div className={`md:hidden flex-1 overflow-y-auto bg-surface-secondary p-4 space-y-4 font-sans select-none ${mobileTab === 'simulation' ? 'block' : 'hidden'}`}>
           {/* Quick Play & Reset Controls */}
-          <div className="flex gap-3">
-            <button
-              onClick={isRunning ? handlePause : handlePlay}
-              className={`flex-1 h-[48px] border-2 border-text-primary font-bold uppercase tracking-wider text-xs transition-fast flex items-center justify-center gap-2 text-white ${
-                isRunning ? 'bg-text-secondary hover:bg-text-primary' : 'bg-accent-primary hover:bg-accent-dark'
-              }`}
-            >
-              {isRunning ? <Pause size={16} className="fill-white text-white" /> : <Play size={16} className="fill-white text-white" />}
-              {isRunning ? 'Pause Simulation' : 'Start Simulation'}
-            </button>
-            <button
-              onClick={handleReset}
-              className="w-[48px] h-[48px] border-2 border-text-primary bg-surface-primary hover:bg-surface-tertiary text-text-primary flex items-center justify-center transition-fast"
-              title="Reset"
-            >
-              <RotateCcw size={18} />
-            </button>
+          <div className="space-y-2">
+            <div className="flex gap-3">
+              <button
+                onClick={isRunning ? handlePause : handlePlay}
+                className={`flex-1 h-[48px] border-2 border-text-primary font-bold uppercase tracking-wider text-xs transition-fast flex items-center justify-center gap-2 text-white ${
+                  isRunning ? 'bg-text-secondary hover:bg-text-primary' : 'bg-accent-primary hover:bg-accent-dark'
+                }`}
+              >
+                {isRunning ? <Pause size={16} className="fill-white text-white" /> : <Play size={16} className="fill-white text-white" />}
+                {isRunning ? 'Pause Simulation' : 'Start Simulation'}
+              </button>
+              <button
+                onClick={handleReset}
+                className="w-[48px] h-[48px] border-2 border-text-primary bg-surface-primary hover:bg-surface-tertiary text-text-primary flex items-center justify-center transition-fast"
+                title="Reset"
+              >
+                <RotateCcw size={18} />
+              </button>
+            </div>
+            {sanitizedConfig.potentialType === 'custom-draw' && (
+              <button
+                type="button"
+                onClick={handleClearDrawnPotential}
+                className="w-full h-[40px] border-2 border-text-primary bg-surface-primary hover:bg-surface-tertiary text-text-primary text-xs font-bold uppercase tracking-wider transition-fast flex items-center justify-center gap-2"
+              >
+                <Trash2 size={14} />
+                Clear Drawn Potential
+              </button>
+            )}
           </div>
 
           {/* Stats Dashboard Grid */}
