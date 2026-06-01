@@ -999,7 +999,10 @@ function App() {
   };
   
   return (
-    <div className="w-screen h-screen flex flex-col md:flex-row overflow-hidden bg-surface-primary">
+    <div 
+      className="w-screen h-screen flex flex-col md:flex-row overflow-y-auto md:overflow-hidden bg-surface-primary"
+      style={{ height: '100dvh' }}
+    >
       {/* Mobile Top Header Bar */}
       <div className="md:hidden w-full h-12 bg-surface-primary border-b border-border-default px-4 flex items-center justify-between z-30 select-none flex-shrink-0 font-sans">
         <div className="flex items-center gap-2">
