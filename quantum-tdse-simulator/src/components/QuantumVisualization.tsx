@@ -175,53 +175,49 @@ export function QuantumVisualization({
         const plotY = margin.top;
         
         const inPlot = (px: number) => px >= plotX && px <= plotX + plotWidth;
-        
         if (!inPlot(x2) && !inPlot(x1)) return;
         
-        const startPx = Math.max(plotX, Math.min(x1, x2));
-        const endPx = Math.min(plotX + plotWidth, Math.max(x1, x2));
-        
-        if (Math.abs(x2 - x1) < 1) {
-          const normX = (x2 - plotX) / plotWidth;
+        // Convert screen coordinates (px, py) to simulation world coordinates
+        const toWorld = (px: number, py: number) => {
+          const normX = (px - plotX) / plotWidth;
           const worldX = plotXMin + normX * (plotXMax - plotXMin);
           
-          const clampedY = Math.max(plotY, Math.min(plotY + plotHeight, y2));
+          const clampedY = Math.max(plotY, Math.min(plotY + plotHeight, py));
           const normY = (plotY + plotHeight - clampedY) / plotHeight;
           const worldY = plotYMin + normY * (plotYMax - plotYMin);
-          
+          return { x: worldX, y: worldY };
+        };
+
+        const w1 = toWorld(x1, y1);
+        const w2 = toWorld(x2, y2);
+        
+        const xStart = Math.min(w1.x, w2.x);
+        const xEnd = Math.max(w1.x, w2.x);
+        
+        let updatedCount = 0;
+        const denom = w2.x - w1.x;
+        
+        for (let i = 0; i < x.length; i++) {
+          if (x[i] >= xStart && x[i] <= xEnd) {
+            const t = Math.abs(denom) > 1e-12 ? (x[i] - w1.x) / denom : 0.5;
+            const worldY = w1.y + t * (w2.y - w1.y);
+            newPotential[i] = worldY / POTENTIAL_VISUAL_SCALE;
+            updatedCount++;
+          }
+        }
+        
+        // Fallback for near-vertical strokes or single clicks/taps
+        if (updatedCount === 0) {
           let closestIdx = 0;
           let minDiff = Infinity;
           for (let i = 0; i < x.length; i++) {
-            const diff = Math.abs(x[i] - worldX);
+            const diff = Math.abs(x[i] - w2.x);
             if (diff < minDiff) {
               minDiff = diff;
               closestIdx = i;
             }
           }
-          newPotential[closestIdx] = worldY / POTENTIAL_VISUAL_SCALE;
-        } else {
-          for (let px = Math.floor(startPx); px <= Math.ceil(endPx); px++) {
-            const t = (px - x1) / (x2 - x1);
-            const py = y1 + t * (y2 - y1);
-            
-            const normX = (px - plotX) / plotWidth;
-            const worldX = plotXMin + normX * (plotXMax - plotXMin);
-            
-            const clampedY = Math.max(plotY, Math.min(plotY + plotHeight, py));
-            const normY = (plotY + plotHeight - clampedY) / plotHeight;
-            const worldY = plotYMin + normY * (plotYMax - plotYMin);
-            
-            let closestIdx = 0;
-            let minDiff = Infinity;
-            for (let i = 0; i < x.length; i++) {
-              const diff = Math.abs(x[i] - worldX);
-              if (diff < minDiff) {
-                minDiff = diff;
-                closestIdx = i;
-              }
-            }
-            newPotential[closestIdx] = worldY / POTENTIAL_VISUAL_SCALE;
-          }
+          newPotential[closestIdx] = w2.y / POTENTIAL_VISUAL_SCALE;
         }
         
         onDrawPotential(new Float64Array(newPotential));
