@@ -7,6 +7,8 @@ import { useEffect, useRef } from 'react';
 import p5 from 'p5';
 import { WavefunctionState } from '../lib/tdse-solver';
 
+const POTENTIAL_VISUAL_SCALE = 0.2;
+
 interface VisualizationProps {
   x: Float64Array;
   potential: Float64Array;
@@ -20,6 +22,8 @@ interface VisualizationProps {
   plotYMax: number;
   potentialType: string;
   onDrawPotential?: (newPotential: Float64Array) => void;
+  previewState?: WavefunctionState | null;
+  previewEigenvalue?: number | null;
 }
 
 export function QuantumVisualization({
@@ -34,7 +38,9 @@ export function QuantumVisualization({
   plotYMin,
   plotYMax,
   potentialType,
-  onDrawPotential
+  onDrawPotential,
+  previewState = null,
+  previewEigenvalue = null
 }: VisualizationProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sketchRef = useRef<p5 | null>(null);
@@ -52,7 +58,9 @@ export function QuantumVisualization({
     plotYMin,
     plotYMax,
     potentialType,
-    onDrawPotential
+    onDrawPotential,
+    previewState,
+    previewEigenvalue
   });
   
   // Update refs when props change
@@ -69,9 +77,11 @@ export function QuantumVisualization({
       plotYMin,
       plotYMax,
       potentialType,
-      onDrawPotential
+      onDrawPotential,
+      previewState,
+      previewEigenvalue
     };
-  }, [x, potential, state, isRunning, energy, totalProbability, plotXMin, plotXMax, plotYMin, plotYMax, potentialType, onDrawPotential]);
+  }, [x, potential, state, isRunning, energy, totalProbability, plotXMin, plotXMax, plotYMin, plotYMax, potentialType, onDrawPotential, previewState, previewEigenvalue]);
   
   useEffect(() => {
     if (!containerRef.current) return;
@@ -178,7 +188,7 @@ export function QuantumVisualization({
               closestIdx = i;
             }
           }
-          newPotential[closestIdx] = worldY;
+          newPotential[closestIdx] = worldY / POTENTIAL_VISUAL_SCALE;
         } else {
           for (let px = Math.floor(startPx); px <= Math.ceil(endPx); px++) {
             const t = (px - px1Local) / (px2 - px1Local);
@@ -200,7 +210,7 @@ export function QuantumVisualization({
                 closestIdx = i;
               }
             }
-            newPotential[closestIdx] = worldY;
+            newPotential[closestIdx] = worldY / POTENTIAL_VISUAL_SCALE;
           }
         }
         
@@ -282,7 +292,7 @@ export function QuantumVisualization({
         p.noFill();
         p.beginShape();
         for (let i = 0; i < potential.length; i++) {
-          p.vertex(mapX(x[i]), mapY(potential[i]));
+          p.vertex(mapX(x[i]), mapY(potential[i] * POTENTIAL_VISUAL_SCALE));
         }
         p.endShape();
         (p.drawingContext as any).setLineDash([]);
@@ -318,6 +328,51 @@ export function QuantumVisualization({
           p.vertex(mapX(x[i]), mapY(state.imag[i]));
         }
         p.endShape();
+        
+        // Draw preview eigenstate if available
+        const { previewState, previewEigenvalue } = propsRef.current;
+        if (previewState && x.length > 0) {
+          // 1. Draw horizontal energy level line (orange solid)
+          if (previewEigenvalue !== null && previewEigenvalue !== undefined) {
+            p.stroke(255, 140, 0, 180); // Orange with transparency
+            p.strokeWeight(1);
+            (p.drawingContext as any).setLineDash([6, 3]);
+            const yLevel = mapY(previewEigenvalue * POTENTIAL_VISUAL_SCALE);
+            p.line(plotX, yLevel, plotX + plotWidth, yLevel);
+            (p.drawingContext as any).setLineDash([]);
+            
+            // Label the energy level
+            p.fill(255, 140, 0);
+            p.noStroke();
+            p.textAlign(p.RIGHT, p.BOTTOM);
+            p.textSize(10);
+            p.textFont('SF Mono, Roboto Mono, Courier New, monospace');
+            p.text(`E = ${previewEigenvalue.toFixed(3)}`, plotX + plotWidth - 5, yLevel - 2);
+          }
+          
+          // 2. Draw probability density of preview state (orange outline)
+          const previewProb = new Float64Array(x.length);
+          for (let i = 0; i < x.length; i++) {
+            previewProb[i] = previewState.real[i] * previewState.real[i] + previewState.imag[i] * previewState.imag[i];
+          }
+          
+          p.stroke(255, 140, 0); // Solid orange
+          p.strokeWeight(2);
+          p.noFill();
+          p.beginShape();
+          for (let i = 0; i < previewProb.length; i++) {
+            p.vertex(mapX(x[i]), mapY(previewProb[i]));
+          }
+          p.endShape();
+          
+          // Draw label at top center of plot
+          p.fill(255, 140, 0);
+          p.noStroke();
+          p.textAlign(p.CENTER, p.TOP);
+          p.textSize(11);
+          p.textFont('Helvetica Neue, Helvetica, Arial, sans-serif');
+          p.text("PREVIEWING BOUND STATE", plotX + plotWidth / 2, plotY + 12);
+        }
         
         // Draw legend
         drawLegend(p, plotX, plotY);
@@ -428,7 +483,7 @@ export function QuantumVisualization({
           { color: [0, 102, 204], label: 'ψ_real', solid: true },
           { color: [204, 0, 0], label: 'ψ_imag', solid: true },
           { color: [0, 170, 68], label: '|ψ|²', solid: true },
-          { color: [102, 102, 102], label: 'V(x)', solid: false }
+          { color: [102, 102, 102], label: 'V(x) (×0.2)', solid: false }
         ];
         
         p.textAlign(p.LEFT, p.CENTER);

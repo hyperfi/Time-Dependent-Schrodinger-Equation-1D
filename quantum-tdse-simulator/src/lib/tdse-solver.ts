@@ -337,11 +337,12 @@ export class TDSESolver {
     
     let kineticEnergy = 0;
     for (let i = 0; i < n; i++) {
-      const re = psi_k[2 * i] / n;
-      const im = psi_k[2 * i + 1] / n;
+      const re = psi_k[2 * i];
+      const im = psi_k[2 * i + 1];
       kineticEnergy += (re * re + im * im) * hbar * hbar * this.k[i] * this.k[i] / (2 * mass);
     }
-    kineticEnergy *= this.dx;
+    // Correct scale is dx / n instead of dx / n^2
+    kineticEnergy *= this.dx / n;
     
     // Potential energy contribution
     let potentialEnergy = 0;
@@ -370,6 +371,162 @@ export class TDSESolver {
     boundaryProb *= this.dx;
     
     return boundaryProb > threshold;
+  }
+  
+  /**
+   * Perform single imaginary time step evolution: dt -> -i * dTau
+   * Kinetic and potential steps act as damping operations, decaying higher energy states.
+   */
+  imaginaryTimeStep(state: WavefunctionState, dTau: number): void {
+    const n = this.params.gridSize;
+    const { hbar, mass } = this.params;
+    
+    // 1. Apply potential decay (half step)
+    for (let i = 0; i < n; i++) {
+      const factor = Math.exp(-this.potential[i] * dTau / (2 * hbar));
+      state.real[i] *= factor;
+      state.imag[i] *= factor;
+    }
+    
+    // 2. FFT to momentum space
+    const psi_interleaved = new Float64Array(2 * n);
+    for (let i = 0; i < n; i++) {
+      psi_interleaved[2 * i] = state.real[i];
+      psi_interleaved[2 * i + 1] = state.imag[i];
+    }
+    const psi_k = this.fft.createComplexArray();
+    this.fft.transform(psi_k, psi_interleaved);
+    
+    // 3. Apply kinetic decay in momentum space
+    for (let i = 0; i < n; i++) {
+      const kVal = this.k[i];
+      const factor = Math.exp(-(hbar * kVal * kVal / (2 * mass)) * dTau);
+      psi_k[2 * i] *= factor;
+      psi_k[2 * i + 1] *= factor;
+    }
+    
+    // 4. IFFT back to position space
+    const psi_out = this.fft.createComplexArray();
+    this.fft.inverseTransform(psi_out, psi_k);
+    
+    for (let i = 0; i < n; i++) {
+      state.real[i] = psi_out[2 * i];
+      state.imag[i] = psi_out[2 * i + 1];
+    }
+    
+    // 5. Apply potential decay (half step)
+    for (let i = 0; i < n; i++) {
+      const factor = Math.exp(-this.potential[i] * dTau / (2 * hbar));
+      state.real[i] *= factor;
+      state.imag[i] *= factor;
+    }
+  }
+  
+  /**
+   * Find first N bound eigenstates and their corresponding energy eigenvalues
+   * uses imaginary time propagation combined with Gram-Schmidt orthogonalization.
+   */
+  findEigenstates(count: number = 4, maxIterations: number = 1000): { energy: number; state: WavefunctionState }[] {
+    const eigenstates: { energy: number; state: WavefunctionState }[] = [];
+    const n = this.params.gridSize;
+    const dTau = 0.05; // imaginary step size
+    
+    // Helper to generate a localized broad Gaussian trial state
+    const createTrialState = (shift: number): WavefunctionState => {
+      const real = new Float64Array(n);
+      const imag = new Float64Array(n);
+      const xMin = this.params.xMin;
+      const xMax = this.params.xMax;
+      const width = xMax - xMin;
+      const sigma = width / 4;
+      
+      const center = (xMin + xMax) / 2 + shift;
+      for (let i = 0; i < n; i++) {
+        const dx = this.x[i] - center;
+        // Broad gaussian + random noise to break parity symmetry
+        real[i] = Math.exp(-dx * dx / (2 * sigma * sigma)) + (Math.random() - 0.5) * 0.01;
+        imag[i] = 0;
+      }
+      const state = { real, imag, time: 0 };
+      this.normalize(state);
+      return state;
+    };
+    
+    for (let s = 0; s < count; s++) {
+      // Alternate centers and add noise to ensure overlapping excited states converge
+      const trial = createTrialState(s % 2 === 0 ? 0 : 0.8);
+      
+      let prevEnergy = this.getEnergy(trial);
+      
+      for (let iter = 0; iter < maxIterations; iter++) {
+        this.imaginaryTimeStep(trial, dTau);
+        
+        // Gram-Schmidt orthogonalization against all lower found eigenstates
+        for (let k = 0; k < s; k++) {
+          const lowerState = eigenstates[k].state;
+          let overlapReal = 0;
+          let overlapImag = 0;
+          
+          for (let i = 0; i < n; i++) {
+            // Correct inner product: <lowerState | trial> = \int lowerState^*(x) * trial(x) dx
+            overlapReal += trial.real[i] * lowerState.real[i] + trial.imag[i] * lowerState.imag[i];
+            overlapImag += trial.imag[i] * lowerState.real[i] - trial.real[i] * lowerState.imag[i];
+          }
+          overlapReal *= this.dx;
+          overlapImag *= this.dx;
+          
+          for (let i = 0; i < n; i++) {
+            trial.real[i] -= overlapReal * lowerState.real[i] - overlapImag * lowerState.imag[i];
+            trial.imag[i] -= overlapReal * lowerState.imag[i] + overlapImag * lowerState.real[i];
+          }
+        }
+        
+        this.normalize(trial);
+        
+        // Check energy convergence every 10 iterations
+        if (iter > 0 && iter % 10 === 0) {
+          const currentEnergy = this.getEnergy(trial);
+          if (Math.abs(currentEnergy - prevEnergy) < 1e-6) {
+            prevEnergy = currentEnergy;
+            break;
+          }
+          prevEnergy = currentEnergy;
+        }
+      }
+      
+      const finalEnergy = this.getEnergy(trial);
+      
+      // Rotate phase so the maximum peak lies on the real axis (textbook look)
+      let maxVal = -1;
+      let maxIdx = 0;
+      for (let i = 0; i < n; i++) {
+        const amp = trial.real[i] * trial.real[i] + trial.imag[i] * trial.imag[i];
+        if (amp > maxVal) {
+          maxVal = amp;
+          maxIdx = i;
+        }
+      }
+      const phase = Math.atan2(trial.imag[maxIdx], trial.real[maxIdx]);
+      const cosPhase = Math.cos(phase);
+      const sinPhase = Math.sin(phase);
+      for (let i = 0; i < n; i++) {
+        const re = trial.real[i];
+        const im = trial.imag[i];
+        trial.real[i] = re * cosPhase + im * sinPhase;
+        trial.imag[i] = im * cosPhase - re * sinPhase;
+      }
+      
+      eigenstates.push({
+        energy: finalEnergy,
+        state: {
+          real: new Float64Array(trial.real),
+          imag: new Float64Array(trial.imag),
+          time: 0
+        }
+      });
+    }
+    
+    return eigenstates;
   }
 }
 

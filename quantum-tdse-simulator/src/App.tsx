@@ -60,6 +60,8 @@ function App() {
   const [isExportingZip, setIsExportingZip] = useState(false);
   const [zipProgress, setZipProgress] = useState(0);
   const [showBoundaryModal, setShowBoundaryModal] = useState(false);
+  const [eigenstates, setEigenstates] = useState<{ energy: number; state: WavefunctionState }[]>([]);
+  const [previewEigenstateIndex, setPreviewEigenstateIndex] = useState<number | null>(null);
   
   // Panel resize and visibility state
   const [isPanelVisible, setIsPanelVisible] = useState(true);
@@ -291,6 +293,10 @@ function App() {
       // Update ABC dynamically
       solver.setABC(config.abcEnabled ?? false, config.abcWidth ?? 2, config.abcStrength ?? 0.5);
       
+      // Clear eigenstates since the potential landscape has changed!
+      setEigenstates([]);
+      setPreviewEigenstateIndex(null);
+      
       // Recalculate energy using the current running wavefunction state if available
       const currentState = stateRef.current;
       if (currentState) {
@@ -499,6 +505,42 @@ function App() {
     // Update config and continue simulation
     setConfig(prev => ({ ...prev, abcEnabled: true }));
     setIsRunning(true);
+  };
+  
+  const handleComputeEigenstates = () => {
+    if (!solver) return;
+    setIsRunning(false);
+    
+    // Stop any animation running
+    if (animationFrameRef.current !== null) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    
+    try {
+      const states = solver.findEigenstates(4);
+      setEigenstates(states);
+      setPreviewEigenstateIndex(null);
+    } catch (e) {
+      console.error('Error computing eigenstates:', e);
+      alert('Failed to compute bound states.');
+    }
+  };
+
+  const handleLoadEigenstate = (index: number) => {
+    if (!solver || index < 0 || index >= eigenstates.length) return;
+    
+    const targetState = eigenstates[index].state;
+    const newState = {
+      real: new Float64Array(targetState.real),
+      imag: new Float64Array(targetState.imag),
+      time: 0
+    };
+    setState(newState);
+    setEnergy(solver.getEnergy(newState));
+    setTotalProbability(solver.getTotalProbability(newState));
+    boundaryWarningShownRef.current = false;
+    setPreviewEigenstateIndex(null); // Clear preview since we loaded it
   };
   
   const handleSave = () => {
@@ -974,6 +1016,11 @@ function App() {
             recordingProgress={recordingProgress}
             isExportingZip={isExportingZip}
             zipProgress={zipProgress}
+            eigenstates={eigenstates}
+            previewEigenstateIndex={previewEigenstateIndex}
+            onComputeEigenstates={handleComputeEigenstates}
+            onPreviewEigenstate={setPreviewEigenstateIndex}
+            onLoadEigenstate={handleLoadEigenstate}
           />
         </div>
       )}
@@ -1023,6 +1070,8 @@ function App() {
               plotYMax={config.plotYMax}
               potentialType={config.potentialType}
               onDrawPotential={handleDrawPotential}
+              previewState={previewEigenstateIndex !== null ? eigenstates[previewEigenstateIndex]?.state : null}
+              previewEigenvalue={previewEigenstateIndex !== null ? eigenstates[previewEigenstateIndex]?.energy : null}
             />
           )}
 

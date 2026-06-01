@@ -9,6 +9,7 @@ import { PotentialType, PRESET_POTENTIALS } from '../lib/potentials';
 import { WavefunctionType, PRESET_WAVEFUNCTIONS } from '../lib/wavefunctions';
 import { ParameterSet } from '../lib/parameters';
 import { ParameterControls } from './ParameterControls';
+import { WavefunctionState } from '../lib/tdse-solver';
 
 export interface SimulationConfig {
   // Potential settings
@@ -68,6 +69,11 @@ interface ControlPanelProps {
   recordingProgress?: number;
   isExportingZip?: boolean;
   zipProgress?: number;
+  eigenstates?: { energy: number; state: WavefunctionState }[];
+  previewEigenstateIndex?: number | null;
+  onComputeEigenstates?: () => void;
+  onPreviewEigenstate?: (index: number | null) => void;
+  onLoadEigenstate?: (index: number) => void;
 }
 
 export function ControlPanel({
@@ -86,9 +92,15 @@ export function ControlPanel({
   isRecording = false,
   recordingProgress = 0,
   isExportingZip = false,
-  zipProgress = 0
+  zipProgress = 0,
+  eigenstates = [],
+  previewEigenstateIndex = null,
+  onComputeEigenstates,
+  onPreviewEigenstate,
+  onLoadEigenstate
 }: ControlPanelProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [activeTab, setActiveTab] = useState<'parameters' | 'presets'>('parameters');
   const [videoFormat, setVideoFormat] = useState('mp4');
   const [frameRate, setFrameRate] = useState(30);
   const [frameRateError, setFrameRateError] = useState('');
@@ -119,8 +131,36 @@ export function ControlPanel({
           Quantum TDSE Simulator
         </h1>
         
-        {/* Potential Section */}
-        <section className="mb-6">
+        {/* Tabs */}
+        <div className="flex border-b border-border-default mb-6 font-sans">
+          <button
+            type="button"
+            onClick={() => setActiveTab('parameters')}
+            className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-fast ${
+              activeTab === 'parameters' 
+                ? 'border-b-2 border-text-primary text-text-primary' 
+                : 'text-text-tertiary hover:text-text-primary'
+            }`}
+          >
+            Parameters
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('presets')}
+            className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-fast ${
+              activeTab === 'presets' 
+                ? 'border-b-2 border-text-primary text-text-primary' 
+                : 'text-text-tertiary hover:text-text-primary'
+            }`}
+          >
+            Presets & Guides
+          </button>
+        </div>
+
+        {activeTab === 'parameters' ? (
+          <>
+            {/* Potential Section */}
+            <section className="mb-6">
           <label className="block text-sm font-medium uppercase tracking-wide text-text-secondary mb-3">
             Potential Type
           </label>
@@ -545,6 +585,77 @@ export function ControlPanel({
           )}
         </section>
         
+        {/* Bound States Finder Section */}
+        {config.potentialType !== 'free' && (
+          <section className="mb-6 pt-6 border-t border-border-default">
+            <label className="block text-sm font-medium uppercase tracking-wide text-text-secondary mb-3">
+              Bound States Finder (ITP)
+            </label>
+            
+            <p className="text-xs text-text-secondary leading-relaxed mb-4">
+              Compute the energy eigenstates for the current potential landscape using Imaginary Time Propagation (ITP).
+            </p>
+            
+            <button
+              type="button"
+              onClick={onComputeEigenstates}
+              disabled={isRunning}
+              className={`w-full h-[40px] text-xs font-bold uppercase tracking-wide rounded-none transition-fast flex items-center justify-center ${
+                isRunning 
+                  ? 'bg-surface-tertiary text-text-disabled cursor-not-allowed border border-border-default' 
+                  : 'bg-surface-primary border border-text-primary text-text-primary hover:bg-surface-secondary'
+              }`}
+            >
+              Calculate Bound States
+            </button>
+            
+            {eigenstates && eigenstates.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <p className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">
+                  Computed States:
+                </p>
+                <div className="border border-border-default bg-surface-primary divide-y divide-border-default font-mono text-xs">
+                  {eigenstates.map((stateInfo, idx) => {
+                    const isPreviewing = previewEigenstateIndex === idx;
+                    return (
+                      <div key={idx} className="p-2 flex items-center justify-between hover:bg-surface-secondary">
+                        <div>
+                          <span className="font-bold text-text-primary">
+                            {idx === 0 ? 'Ground' : `${idx}* Exc`}
+                          </span>
+                          <span className="text-text-tertiary ml-2">
+                            E = {stateInfo.energy.toFixed(3)}
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => onPreviewEigenstate?.(isPreviewing ? null : idx)}
+                            className={`px-2 py-1 text-[10px] uppercase font-bold tracking-wider border transition-fast ${
+                              isPreviewing
+                                ? 'bg-border-focus text-white border-border-focus'
+                                : 'bg-surface-secondary hover:bg-surface-tertiary border-border-default text-text-secondary'
+                            }`}
+                          >
+                            {isPreviewing ? 'Previewing' : 'Preview'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onLoadEigenstate?.(idx)}
+                            className="px-2 py-1 text-[10px] uppercase font-bold tracking-wider bg-accent-primary hover:bg-accent-dark text-white border-none transition-fast"
+                          >
+                            Load
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+        
         {/* Advanced Settings */}
         <section className="mb-6 pt-6 border-t border-border-default">
           <button
@@ -945,6 +1056,126 @@ export function ControlPanel({
             </label>
           </div>
         </section>
+          </>
+        ) : (
+          <div className="space-y-4 font-sans">
+            <p className="text-xs text-text-tertiary mb-4 leading-relaxed font-regular">
+              Select an interactive scenario below to load curated potential profiles and initial state configurations.
+            </p>
+            
+            {/* Free Dispersion */}
+            <div className="bg-surface-primary border border-border-default p-4 space-y-2">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-text-primary">
+                1. Free Expansion (Dispersion)
+              </h3>
+              <p className="text-xs text-text-secondary leading-relaxed">
+                Demonstrates wavepacket spreading in free space ($V=0$). Without external forces, a localized wavepacket expands over time, illustrating the expansion of quantum uncertainty.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  onConfigChange({
+                    potentialType: 'free',
+                    wavefunctionType: 'gaussian',
+                    wavefunctionX0: 0,
+                    wavefunctionSigma: 1,
+                    wavefunctionK0: 0,
+                    abcEnabled: false
+                  });
+                }}
+                className="mt-2 w-full h-[36px] bg-accent-primary hover:bg-accent-dark text-white text-xs font-bold uppercase tracking-wide rounded-none transition-fast flex items-center justify-center animate-in fade-in"
+              >
+                Load Preset & Reset
+              </button>
+            </div>
+
+            {/* Quantum Tunneling */}
+            <div className="bg-surface-primary border border-border-default p-4 space-y-2">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-text-primary">
+                2. Quantum Tunneling
+              </h3>
+              <p className="text-xs text-text-secondary leading-relaxed">
+                A wavepacket traveling with energy $E_k \approx 8.0$ meets a rectangular potential barrier of height $V_0 = 10.0$. Shows wave tunneling through classically forbidden regions.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  onConfigChange({
+                    potentialType: 'barrier',
+                    potentialV0: 10,
+                    potentialX0: 0,
+                    potentialWidth: 1.5,
+                    wavefunctionType: 'gaussian',
+                    wavefunctionX0: -5,
+                    wavefunctionSigma: 1,
+                    wavefunctionK0: 4,
+                    abcEnabled: true,
+                    abcWidth: 2,
+                    abcStrength: 0.5
+                  });
+                }}
+                className="mt-2 w-full h-[36px] bg-accent-primary hover:bg-accent-dark text-white text-xs font-bold uppercase tracking-wide rounded-none transition-fast flex items-center justify-center"
+              >
+                Load Preset & Reset
+              </button>
+            </div>
+
+            {/* Coherent Harmonic State */}
+            <div className="bg-surface-primary border border-border-default p-4 space-y-2">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-text-primary">
+                3. Coherent Harmonic State
+              </h3>
+              <p className="text-xs text-text-secondary leading-relaxed">
+                A Gaussian wavepacket is displaced inside a parabolic potential well ($V \propto x^2$). The packet oscillates back and forth coherently without spreading, mimicking a classical pendulum.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  onConfigChange({
+                    potentialType: 'harmonic',
+                    potentialOmega: 1.0,
+                    potentialX0: 0,
+                    wavefunctionType: 'gaussian',
+                    wavefunctionX0: -3,
+                    wavefunctionSigma: 1,
+                    wavefunctionK0: 0,
+                    abcEnabled: false
+                  });
+                }}
+                className="mt-2 w-full h-[36px] bg-accent-primary hover:bg-accent-dark text-white text-xs font-bold uppercase tracking-wide rounded-none transition-fast flex items-center justify-center"
+              >
+                Load Preset & Reset
+              </button>
+            </div>
+
+            {/* Double-Well Oscillation */}
+            <div className="bg-surface-primary border border-border-default p-4 space-y-2">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-text-primary">
+                4. Double-Well Oscillation
+              </h3>
+              <p className="text-xs text-text-secondary leading-relaxed">
+                A wavefunction localized in the left well of a symmetric double-well potential ($V \propto (x^2 - 4)^2$) slowly tunnels to the right well and back, demonstrating coherent tunneling.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  onConfigChange({
+                    potentialType: 'custom-function',
+                    customPotentialFunction: '0.05 * (x^2 - 4)^2',
+                    wavefunctionType: 'gaussian',
+                    wavefunctionX0: -2.0,
+                    wavefunctionSigma: 0.7,
+                    wavefunctionK0: 0,
+                    abcEnabled: false
+                  });
+                }}
+                className="mt-2 w-full h-[36px] bg-accent-primary hover:bg-accent-dark text-white text-xs font-bold uppercase tracking-wide rounded-none transition-fast flex items-center justify-center"
+              >
+                Load Preset & Reset
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
