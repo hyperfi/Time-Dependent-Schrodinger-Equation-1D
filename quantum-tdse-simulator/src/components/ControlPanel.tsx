@@ -127,9 +127,20 @@ export function ControlPanel({
     <div className="w-full h-full bg-surface-secondary border-r border-border-default overflow-y-auto">
       <div className="p-8 pt-8">
         {/* Title */}
-        <h1 className="text-2xl font-bold text-text-primary mb-8">
+        <h1 className="text-2xl font-bold text-text-primary mb-1">
           Quantum TDSE Simulator
         </h1>
+        <div className="text-[10px] uppercase tracking-wider text-text-tertiary mb-6 font-sans">
+          Developed by{' '}
+          <a
+            href="https://www.dr-abhishek.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-accent-primary hover:text-accent-dark hover:underline font-bold transition-fast"
+          >
+            Dr. Abhishek
+          </a>
+        </div>
         
         {/* Tabs */}
         <div className="flex border-b border-border-default mb-6 font-sans">
