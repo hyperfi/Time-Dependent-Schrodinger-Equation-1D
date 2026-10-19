@@ -31,12 +31,18 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
-          version: 8
+          version: 9
 
       - name: Install dependencies
         run: |
           cd quantum-tdse-simulator
-          pnpm install --no-frozen-lockfile
+          pnpm install --frozen-lockfile
+
+      - name: Validate physics and source
+        run: |
+          cd quantum-tdse-simulator
+          pnpm test
+          pnpm lint
 
       - name: Build
         run: |

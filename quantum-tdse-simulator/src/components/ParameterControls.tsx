@@ -312,6 +312,8 @@ export function ParameterControls({
 /**
  * Hook for managing parameter state
  */
+// This legacy file intentionally exports its small colocated hook.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useParameters(initialParameters: ParameterSet = {}) {
   const [parameters, setParameters] = useState<ParameterSet>(initialParameters);
 

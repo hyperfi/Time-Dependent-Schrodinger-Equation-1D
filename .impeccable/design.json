@@ -1,0 +1,103 @@
+{
+  "product": "Quantum TDSE Simulator",
+  "direction": "Measurement studio",
+  "basis": "Implemented source inspected on 2026-10-19",
+  "sourceRoot": "quantum-tdse-simulator",
+  "principles": [
+    "Make the actual simulation and scientific meaning visible",
+    "Keep reproducible checkpoint comparison central",
+    "Preserve simulator identity and Dr. Abhishek attribution",
+    "Use labels, scales and line styles alongside color"
+  ],
+  "colors": {
+    "cssVariables": {
+      "--ink": "#253c32",
+      "--muted": "#637268",
+      "--accent": "#147568",
+      "--accent-light": "#e6f1eb",
+      "--line": "#dfe7df",
+      "--canvas": "#ffffff"
+    },
+    "surfaces": {
+      "workspace": "#f2f5f2",
+      "inspector": "#fcfdfb",
+      "darkButton": "#283e32",
+      "plotGrid": "#edf1ee"
+    },
+    "data": {
+      "baselineCurve": "#168577",
+      "variantCurve": "#ba6747",
+      "potential": "#b78336",
+      "real": "#6275bc",
+      "imaginary": "#b85b78",
+      "baselineValue": "#147568",
+      "variantValue": "#a65335"
+    },
+    "feedback": {
+      "noticeText": "#355e45",
+      "noticeSurface": "#eaf3ec",
+      "errorText": "#8d422a",
+      "errorSurface": "#fff1ec",
+      "warningHeading": "#8b621d",
+      "warningDot": "#ac751d"
+    }
+  },
+  "typography": {
+    "ui": "Manrope, Segoe UI, sans-serif",
+    "localFont": "/fonts/manrope.woff2",
+    "localFontWeights": "400 800",
+    "bodyPx": 13,
+    "bodyLineHeight": 1.55,
+    "title": { "defaultPx": 27, "largePx": 30, "mobilePx": 23, "weight": 750 },
+    "measurements": "Consolas, monospace",
+    "positionPlotRequestedFont": "11px IBM Plex Mono, Consolas, monospace",
+    "secondaryPlots": "11px Consolas, monospace",
+    "math": "Georgia, serif",
+    "note": "IBM Plex Mono is requested by the position renderer; App.css declares only Manrope through @font-face."
+  },
+  "geometry": {
+    "declaredRadiusPx": 12,
+    "componentRadiiPx": { "plot": 11, "observables": 9, "transport": 10, "button": 7, "input": "5-6" },
+    "defaultSpacingPx": { "workbenchSides": 30, "analysisGap": 20, "inspectorSides": 23, "betweenPlots": 16 },
+    "minimumPageWidthPx": 320,
+    "workbenchMaxWidthPx": 1600,
+    "drawerMaxWidthPx": 490
+  },
+  "layout": {
+    "desktop": {
+      "header": { "heightPx": 76, "position": "sticky", "topPx": 0, "zIndex": 20 },
+      "setup": { "widthPx": 270, "position": "sticky", "topPx": 76, "maxHeight": "calc(100dvh - 76px)", "contentOverflow": "auto" },
+      "measurementRailPx": 228,
+      "positionPlotHeightPx": 335,
+      "lowerPlotHeightPx": 151,
+      "transport": { "position": "sticky", "bottomPx": 12, "zIndex": 10 }
+    },
+    "breakpoints": [
+      { "query": "min-width: 1500px", "setupWidthPx": 290, "measurementRailPx": 245, "analysisGapPx": 26, "positionPlotHeightPx": 390, "lowerPlotHeightPx": 170 },
+      { "query": "max-width: 1200px", "setupWidthPx": 240, "measurementRailPx": 199, "analysisGapPx": 15, "workbenchSidesPx": 22 },
+      { "query": "max-width: 1030px", "measurements": "Below plots in two columns; diagnostics span both", "positionPlotHeightPx": 300 },
+      { "query": "max-width: 760px", "headerHeightPx": 64, "headerTopPx": 0, "navigationLinks": "hidden", "workbenchSidesPx": 16, "setup": "Fixed left sheet with scrim, width min(335px, 90vw), height 100dvh, top 0, z-index 45", "positionPlotHeightPx": 290, "lowerPlotHeightPx": 140, "transportBottomPx": 9 },
+      { "query": "min-width: 380px and max-width: 760px", "transportIconSizePx": [40, 44], "playMinimumSizePx": [70, 44] }
+    ],
+    "overlayZIndex": { "setup": 45, "drawer": 50, "skipLink": 100 },
+    "anchorScrollPaddingTopPx": 90
+  },
+  "interaction": {
+    "focus": "2px solid accent, outline-offset 3px",
+    "disabledOpacity": 0.48,
+    "comparison": "A solid teal; B dashed coral, with text labels and paired values",
+    "potentialScale": "Explicit separate right axis",
+    "transitionsMs": { "controls": 160, "scrim": 160, "drawer": 200 },
+    "reducedMotion": "Disable CSS animations and transitions",
+    "keyboard": ["Space: play/pause", "Right arrow: one step", "Escape: close dialog"],
+    "dialogs": "Named modal dialogs with focus trap and focus restoration"
+  },
+  "evidence": {
+    "authority": "Source implementation; no raster comp",
+    "screenshots": [
+      "quantum-tdse-simulator/.impeccable/review/desktop.png",
+      "quantum-tdse-simulator/.impeccable/review/mobile-full.png"
+    ],
+    "limitation": "Review screenshots predate the latest sticky-header change. Browser access was disabled in Work settings, preventing final recapture and live-scroll verification."
+  }
+}

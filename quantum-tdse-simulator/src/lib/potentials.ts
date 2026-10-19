@@ -3,25 +3,25 @@
  * Provides preset potentials and custom function parsing
  */
 
-import type { ParameterSet } from './parameters';
-import { compileRealExpression } from './expressions';
+import type { ParameterSet } from "./parameters";
+import { compileRealExpression } from "./expressions";
 
-export type PotentialType = 
-  | 'free'
-  | 'barrier'
-  | 'well'
-  | 'harmonic'
-  | 'custom-function'
-  | 'custom-draw';
+export type PotentialType =
+  | "free"
+  | "barrier"
+  | "well"
+  | "harmonic"
+  | "custom-function"
+  | "custom-draw";
 
 export interface PotentialConfig {
   type: PotentialType;
   // Barrier/Well parameters
-  v0?: number;       // Potential height/depth
-  x0?: number;       // Center position
-  width?: number;    // Width
+  v0?: number; // Potential height/depth
+  x0?: number; // Center position
+  width?: number; // Width
   // Harmonic oscillator parameters
-  omega?: number;    // Angular frequency
+  omega?: number; // Angular frequency
   // Custom function
   customFunction?: string;
   // Custom draw
@@ -43,11 +43,11 @@ export function createBarrierPotential(
   x: Float64Array,
   v0: number,
   x0: number,
-  width: number
+  width: number,
 ): Float64Array {
   const V = new Float64Array(x.length);
   const halfWidth = width / 2;
-  
+
   for (let i = 0; i < x.length; i++) {
     if (Math.abs(x[i] - x0) < halfWidth) {
       V[i] = v0;
@@ -55,7 +55,7 @@ export function createBarrierPotential(
       V[i] = 0;
     }
   }
-  
+
   return V;
 }
 
@@ -67,11 +67,11 @@ export function createWellPotential(
   x: Float64Array,
   v0: number,
   x0: number,
-  width: number
+  width: number,
 ): Float64Array {
   const V = new Float64Array(x.length);
   const halfWidth = width / 2;
-  
+
   for (let i = 0; i < x.length; i++) {
     if (Math.abs(x[i] - x0) < halfWidth) {
       V[i] = -v0;
@@ -79,7 +79,7 @@ export function createWellPotential(
       V[i] = 0;
     }
   }
-  
+
   return V;
 }
 
@@ -91,15 +91,15 @@ export function createHarmonicPotential(
   x: Float64Array,
   mass: number,
   omega: number,
-  x0: number
+  x0: number,
 ): Float64Array {
   const V = new Float64Array(x.length);
-  
+
   for (let i = 0; i < x.length; i++) {
     const dx = x[i] - x0;
     V[i] = 0.5 * mass * omega * omega * dx * dx;
   }
-  
+
   return V;
 }
 
@@ -107,9 +107,14 @@ export function createHarmonicPotential(
  * Parse and evaluate custom potential function with parameter support
  * Supports: x, parameters (A, k, phi, etc.), numbers, +, -, *, /, ^, sin, cos, tan, exp, sqrt, abs, log, ln, sinh, cosh, tanh
  */
-export function createCustomFunctionPotential(x: Float64Array, expression: string, parameters: ParameterSet = {}): Float64Array {
+export function createCustomFunctionPotential(
+  x: Float64Array,
+  expression: string,
+  parameters: ParameterSet = {},
+): Float64Array {
+  if (/\bt\b/.test(expression)) throw new Error("This release supports static V(x). Time-dependent potentials are not implemented.");
   const evaluate = compileRealExpression(expression, parameters);
-  return Float64Array.from(x, xi => evaluate(xi));
+  return Float64Array.from(x, (xi) => evaluate(xi));
 }
 
 /**
@@ -117,25 +122,25 @@ export function createCustomFunctionPotential(x: Float64Array, expression: strin
  */
 export function createDrawnPotential(
   x: Float64Array,
-  points: { x: number; y: number }[]
+  points: { x: number; y: number }[],
 ): Float64Array {
   const V = new Float64Array(x.length);
-  
+
   if (points.length === 0) {
     return V; // All zeros
   }
-  
+
   // Sort points by x
   const sortedPoints = [...points].sort((a, b) => a.x - b.x);
-  
+
   // Linear interpolation
   for (let i = 0; i < x.length; i++) {
     const xi = x[i];
-    
+
     // Find surrounding points
     let leftIdx = 0;
     let rightIdx = sortedPoints.length - 1;
-    
+
     for (let j = 0; j < sortedPoints.length - 1; j++) {
       if (xi >= sortedPoints[j].x && xi <= sortedPoints[j + 1].x) {
         leftIdx = j;
@@ -143,7 +148,7 @@ export function createDrawnPotential(
         break;
       }
     }
-    
+
     // Interpolate
     if (xi <= sortedPoints[0].x) {
       V[i] = sortedPoints[0].y;
@@ -154,12 +159,12 @@ export function createDrawnPotential(
       const x2 = sortedPoints[rightIdx].x;
       const y1 = sortedPoints[leftIdx].y;
       const y2 = sortedPoints[rightIdx].y;
-      
+
       const t = (xi - x1) / (x2 - x1);
       V[i] = y1 + t * (y2 - y1);
     }
   }
-  
+
   return V;
 }
 
@@ -170,48 +175,52 @@ export function generatePotential(
   x: Float64Array,
   config: PotentialConfig,
   mass: number = 1,
-  parameters: ParameterSet = {}
+  parameters: ParameterSet = {},
 ): Float64Array {
   switch (config.type) {
-    case 'free':
+    case "free":
       return createFreePotential(x);
-    
-    case 'barrier':
+
+    case "barrier":
       return createBarrierPotential(
         x,
         config.v0 ?? 5,
         config.x0 ?? 0,
-        config.width ?? 2
+        config.width ?? 2,
       );
-    
-    case 'well':
+
+    case "well":
       return createWellPotential(
         x,
         config.v0 ?? 5,
         config.x0 ?? 0,
-        config.width ?? 2
+        config.width ?? 2,
       );
-    
-    case 'harmonic':
+
+    case "harmonic":
       return createHarmonicPotential(
         x,
         mass,
         config.omega ?? 1,
-        config.x0 ?? 0
+        config.x0 ?? 0,
       );
-    
-    case 'custom-function':
+
+    case "custom-function":
       if (!config.customFunction) {
-        throw new Error('Custom function not provided');
+        throw new Error("Custom function not provided");
       }
-      return createCustomFunctionPotential(x, config.customFunction, parameters);
-    
-    case 'custom-draw':
+      return createCustomFunctionPotential(
+        x,
+        config.customFunction,
+        parameters,
+      );
+
+    case "custom-draw":
       if (!config.customPoints || config.customPoints.length === 0) {
         return createFreePotential(x);
       }
       return createDrawnPotential(x, config.customPoints);
-    
+
     default:
       return createFreePotential(x);
   }
@@ -220,12 +229,21 @@ export function generatePotential(
 /**
  * Validate potential function string with comprehensive error reporting and parameter support
  */
-export function validatePotentialFunction(expression: string, parameters: ParameterSet = {}): { valid: boolean; error?: string; examples?: string[] } {
+export function validatePotentialFunction(
+  expression: string,
+  parameters: ParameterSet = {},
+): { valid: boolean; error?: string; examples?: string[] } {
   try {
-    const evaluate = compileRealExpression(expression, parameters);
-    [0, 1, -1, 0.5, -0.5].forEach(x => evaluate(x));
+    if (/\bt\b/.test(expression)) throw new Error("This release supports static V(x). Time-dependent potentials are not implemented.");
+  const evaluate = compileRealExpression(expression, parameters);
+    [0, 1, -1, 0.5, -0.5].forEach((x) => evaluate(x));
     return { valid: true };
-  } catch (error) { return { valid: false, error: error instanceof Error ? error.message : String(error) }; }
+  } catch (error) {
+    return {
+      valid: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 /**
@@ -233,37 +251,37 @@ export function validatePotentialFunction(expression: string, parameters: Parame
  */
 export const PRESET_POTENTIALS = {
   free: {
-    type: 'free' as PotentialType,
-    label: 'Free Particle',
-    description: 'No potential (V = 0)'
+    type: "free" as PotentialType,
+    label: "Free Particle",
+    description: "No potential (V = 0)",
   },
   barrier: {
-    type: 'barrier' as PotentialType,
-    label: 'Potential Barrier',
-    description: 'Step potential barrier',
+    type: "barrier" as PotentialType,
+    label: "Potential Barrier",
+    description: "Step potential barrier",
     defaultParams: {
       v0: 5,
       x0: 0,
-      width: 2
-    }
+      width: 2,
+    },
   },
   well: {
-    type: 'well' as PotentialType,
-    label: 'Finite Well',
-    description: 'Finite potential well',
+    type: "well" as PotentialType,
+    label: "Finite Well",
+    description: "Finite potential well",
     defaultParams: {
       v0: 5,
       x0: 0,
-      width: 4
-    }
+      width: 4,
+    },
   },
   harmonic: {
-    type: 'harmonic' as PotentialType,
-    label: 'Harmonic Oscillator',
-    description: 'Quadratic potential V = ½mω²x²',
+    type: "harmonic" as PotentialType,
+    label: "Harmonic Oscillator",
+    description: "Quadratic potential V = ½mω²x²",
     defaultParams: {
       omega: 1,
-      x0: 0
-    }
-  }
+      x0: 0,
+    },
+  },
 };
