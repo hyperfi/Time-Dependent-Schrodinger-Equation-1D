@@ -1,0 +1,93 @@
+{
+  "scope": "Selected local numerical probes; not a convergence study or full validation suite.",
+  "parameters": {
+    "gridSize": 512,
+    "xMin": -10,
+    "xMax": 10,
+    "dt": 0.005,
+    "hbar": 1,
+    "mass": 1,
+    "abcEnabled": false
+  },
+  "stochasticNote": "ITP currently uses Math.random; eigenvalue results may vary between runs.",
+  "freeGaussian": {
+    "time": 1.0000000000000007,
+    "observed": {
+      "norm": 1.000000000000001,
+      "mean": -0.9999999903051665,
+      "variance": 1.2499999848668697
+    },
+    "expected": {
+      "mean": -1,
+      "variance": 1.25
+    },
+    "caveat": "step() forcibly normalizes with absorption disabled; reported norm is not raw drift."
+  },
+  "harmonicEigenvalues": {
+    "observed": [
+      0.5000000154141434,
+      1.5000005004385677,
+      2.4999995588526076,
+      3.5000003858694257
+    ],
+    "expected": [
+      0.5,
+      1.5,
+      2.5,
+      3.5
+    ]
+  },
+  "documentedComplexExpression": {
+    "expression": "exp(i*x)",
+    "x": 1,
+    "observed": {
+      "real": 2.718281828459045,
+      "imag": 0
+    },
+    "expected": {
+      "real": 0.5403023058681398,
+      "imag": 0.8414709848078965
+    }
+  },
+  "documentedGaussianExpression": {
+    "valid": false,
+    "error": "Invalid expression at x=0: Error: Failed to evaluate wavefunction at x=0, t=0: SyntaxError: Unary operator used immediately before exponentiation expression. Parenthesis must be used to disambiguate operator precedence",
+    "examples": [
+      "exp(-x^2/2)",
+      "exp(i*x)",
+      "exp(-x^2/2)*exp(i*x)",
+      "A*exp(-x^2/2)",
+      "A*cos(k*x)"
+    ]
+  },
+  "parameterNames": {
+    "A": false,
+    "k": false,
+    "phi": true
+  },
+  "coherentPreset": {
+    "initialVariance": 1,
+    "time": 1.5709999999999378,
+    "observed": {
+      "norm": 0.9999999999999994,
+      "mean": 0.0006112159855852735,
+      "variance": 0.2500000937014476
+    },
+    "coherentRequiredSigma": 0.7071067811865476
+  },
+  "energyOfScaledState": {
+    "probability": 0.25000000000000006,
+    "displayedEnergy": 1.15625002488753,
+    "conditionalEnergy": 4.625000099550119,
+    "normalizedReferenceEnergy": 4.62500009955012
+  },
+  "freePotentialEigenstates": {
+    "energies": [
+      0.00008218260673532105,
+      0.049277511628356946,
+      0.04934758494252783,
+      0.19738519562633267
+    ],
+    "interpretation": "Finite periodic-box modes; not localized bound states of a free particle on the line."
+  }
+}

@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:prod": "vite build",
-    "build:github": "vite build",
+    "build:prod": "tsc -b && vite build",
+    "build:github": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node scripts/test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

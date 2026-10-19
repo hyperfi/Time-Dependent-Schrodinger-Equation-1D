@@ -5,8 +5,8 @@
 
 import { useState } from 'react';
 import { Play, Pause, RotateCcw, Upload, Download, Video, Camera, FileArchive } from 'lucide-react';
-import { PotentialType, PRESET_POTENTIALS } from '../lib/potentials';
-import { WavefunctionType, PRESET_WAVEFUNCTIONS } from '../lib/wavefunctions';
+import { validatePotentialFunction, PotentialType, PRESET_POTENTIALS } from '../lib/potentials';
+import { validateWavefunctionFunctions, WavefunctionType, PRESET_WAVEFUNCTIONS } from '../lib/wavefunctions';
 import { ParameterSet } from '../lib/parameters';
 import { ParameterControls } from './ParameterControls';
 import { WavefunctionState } from '../lib/tdse-solver';
@@ -307,7 +307,6 @@ export function ControlPanel({
                   // Validate in real-time
                   if (newFunc.trim()) {
                     try {
-                      const { validatePotentialFunction } = require('../lib/potentials');
                       const validation = validatePotentialFunction(newFunc, potentialParameters);
                       if (!validation.valid) {
                         setPotentialError(validation.error || 'Invalid function');
@@ -511,7 +510,6 @@ export function ControlPanel({
                     // Validate in real-time
                     if (newExpr.trim() || config.wavefunctionImagExpr.trim()) {
                       try {
-                        const { validateWavefunctionFunctions } = require('../lib/wavefunctions');
                         const validation = validateWavefunctionFunctions(newExpr, config.wavefunctionImagExpr, wavefunctionParameters);
                         if (!validation.valid) {
                           setWavefunctionError(validation.error || 'Invalid function');
@@ -550,7 +548,6 @@ export function ControlPanel({
                     // Validate in real-time
                     if (newExpr.trim() || config.wavefunctionRealExpr.trim()) {
                       try {
-                        const { validateWavefunctionFunctions } = require('../lib/wavefunctions');
                         const validation = validateWavefunctionFunctions(config.wavefunctionRealExpr, newExpr, wavefunctionParameters);
                         if (!validation.valid) {
                           setWavefunctionError(validation.error || 'Invalid function');
@@ -1097,7 +1094,7 @@ export function ControlPanel({
                     potentialType: 'free',
                     wavefunctionType: 'gaussian',
                     wavefunctionX0: 0,
-                    wavefunctionSigma: 1,
+                    wavefunctionSigma: Math.SQRT1_2,
                     wavefunctionK0: 0,
                     abcEnabled: false
                   }, true);
@@ -1156,7 +1153,7 @@ export function ControlPanel({
                     potentialX0: 0,
                     wavefunctionType: 'gaussian',
                     wavefunctionX0: -3,
-                    wavefunctionSigma: 1,
+                    wavefunctionSigma: Math.SQRT1_2,
                     wavefunctionK0: 0,
                     abcEnabled: false
                   }, true);

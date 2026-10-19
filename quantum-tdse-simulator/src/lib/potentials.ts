@@ -3,7 +3,8 @@
  * Provides preset potentials and custom function parsing
  */
 
-import { ParameterSet, substituteParameters } from './parameters';
+import type { ParameterSet } from './parameters';
+import { compileRealExpression } from './expressions';
 
 export type PotentialType = 
   | 'free'
@@ -106,78 +107,9 @@ export function createHarmonicPotential(
  * Parse and evaluate custom potential function with parameter support
  * Supports: x, parameters (A, k, phi, etc.), numbers, +, -, *, /, ^, sin, cos, tan, exp, sqrt, abs, log, ln, sinh, cosh, tanh
  */
-export function createCustomFunctionPotential(
-  x: Float64Array,
-  functionString: string,
-  parameters: ParameterSet = {}
-): Float64Array {
-  const V = new Float64Array(x.length);
-  
-  // Enhanced expression parser with parameter support
-  const safeEval = (expr: string, xVal: number): number => {
-    try {
-      // Basic validation
-      if (!expr || expr.trim() === '') {
-        throw new Error('Empty expression');
-      }
-      
-      // Replace parameters with their values
-      let evalExpr = substituteParameters(expr, parameters);
-      
-      // Replace x with actual value
-      evalExpr = evalExpr.replace(/\bx\b/g, `(${xVal})`);
-      
-      // Replace ^ with ** for JavaScript
-      evalExpr = evalExpr.replace(/\^/g, '**');
-      
-      // Replace mathematical functions
-      evalExpr = evalExpr.replace(/\bsin\s*\(/g, 'Math.sin(');
-      evalExpr = evalExpr.replace(/\bcos\s*\(/g, 'Math.cos(');
-      evalExpr = evalExpr.replace(/\btan\s*\(/g, 'Math.tan(');
-      evalExpr = evalExpr.replace(/\bexp\s*\(/g, 'Math.exp(');
-      evalExpr = evalExpr.replace(/\bsqrt\s*\(/g, 'Math.sqrt(');
-      evalExpr = evalExpr.replace(/\babs\s*\(/g, 'Math.abs(');
-      evalExpr = evalExpr.replace(/\blog\s*\(/g, 'Math.log(');
-      evalExpr = evalExpr.replace(/\bln\s*\(/g, 'Math.log(');
-      
-      // Add hyperbolic functions
-      evalExpr = evalExpr.replace(/\bsinh\s*\(/g, 'Math.sinh(');
-      evalExpr = evalExpr.replace(/\bcosh\s*\(/g, 'Math.cosh(');
-      evalExpr = evalExpr.replace(/\btanh\s*\(/g, 'Math.tanh(');
-      
-      // Constants
-      evalExpr = evalExpr.replace(/\bpi\b/gi, 'Math.PI');
-      evalExpr = evalExpr.replace(/\be\b/g, 'Math.E');
-      
-      // Additional safety checks
-      if (!/^[\d\s\+\-\*\/\.\(\)\w\^\s]*$/.test(evalExpr)) {
-        throw new Error('Invalid characters in expression');
-      }
-      
-      // Evaluate (using Function constructor for safety)
-      const result = new Function('Math', `return ${evalExpr}`)(Math);
-      
-      if (typeof result !== 'number' || !isFinite(result)) {
-        throw new Error(`Expression evaluates to non-finite number: ${result}`);
-      }
-      
-      return result;
-    } catch (error) {
-      console.error(`Error evaluating expression "${expr}" at x=${xVal}:`, error);
-      throw error; // Re-throw to be caught at higher level
-    }
-  };
-  
-  for (let i = 0; i < x.length; i++) {
-    try {
-      V[i] = safeEval(functionString, x[i]);
-    } catch (error) {
-      // If evaluation fails, set to a reasonable default or throw
-      throw new Error(`Failed to evaluate potential function at x=${x[i]}: ${error}`);
-    }
-  }
-  
-  return V;
+export function createCustomFunctionPotential(x: Float64Array, expression: string, parameters: ParameterSet = {}): Float64Array {
+  const evaluate = compileRealExpression(expression, parameters);
+  return Float64Array.from(x, xi => evaluate(xi));
 }
 
 /**
@@ -288,76 +220,12 @@ export function generatePotential(
 /**
  * Validate potential function string with comprehensive error reporting and parameter support
  */
-export function validatePotentialFunction(functionString: string, parameters: ParameterSet = {}): {
-  valid: boolean;
-  error?: string;
-  examples?: string[];
-} {
+export function validatePotentialFunction(expression: string, parameters: ParameterSet = {}): { valid: boolean; error?: string; examples?: string[] } {
   try {
-    if (!functionString || functionString.trim() === '') {
-      return { 
-        valid: false, 
-        error: 'Expression cannot be empty',
-        examples: ['0.5*x^2', 'exp(-x^2)', 'sin(x)', 'sinh(x)', 'A*sin(k*x+phi)']
-      };
-    }
-    
-    // Test with multiple sample values
-    const testValues = [0, 1, -1, 0.5, -0.5];
-    
-    for (const testX of testValues) {
-      let testExpr = substituteParameters(functionString, parameters);
-      testExpr = testExpr.replace(/\bx\b/g, `(${testX})`);
-      testExpr = testExpr.replace(/\^/g, '**');
-      testExpr = testExpr.replace(/\bsin\s*\(/g, 'Math.sin(');
-      testExpr = testExpr.replace(/\bcos\s*\(/g, 'Math.cos(');
-      testExpr = testExpr.replace(/\btan\s*\(/g, 'Math.tan(');
-      testExpr = testExpr.replace(/\bexp\s*\(/g, 'Math.exp(');
-      testExpr = testExpr.replace(/\bsqrt\s*\(/g, 'Math.sqrt(');
-      testExpr = testExpr.replace(/\babs\s*\(/g, 'Math.abs(');
-      testExpr = testExpr.replace(/\blog\s*\(/g, 'Math.log(');
-      testExpr = testExpr.replace(/\bln\s*\(/g, 'Math.log(');
-      
-      // Add hyperbolic functions
-      testExpr = testExpr.replace(/\bsinh\s*\(/g, 'Math.sinh(');
-      testExpr = testExpr.replace(/\bcosh\s*\(/g, 'Math.cosh(');
-      testExpr = testExpr.replace(/\btanh\s*\(/g, 'Math.tanh(');
-      
-      // Constants
-      testExpr = testExpr.replace(/\bpi\b/gi, 'Math.PI');
-      testExpr = testExpr.replace(/\be\b/g, 'Math.E');
-      
-      const result = new Function('Math', `return ${testExpr}`)(Math);
-      
-      if (typeof result !== 'number' || !isFinite(result)) {
-        return { 
-          valid: false, 
-          error: `Expression does not evaluate to a finite number at x=${testX}`,
-          examples: ['0.5*x^2', 'exp(-x^2)', 'sin(x)', 'sinh(x)', 'A*sin(k*x+phi)']
-        };
-      }
-    }
-    
-    return { 
-      valid: true,
-      examples: [
-        '0.5*x^2', 
-        'exp(-x^2)', 
-        'sin(x)', 
-        'sinh(x)', 
-        'cosh(x)+1',
-        'A*sin(k*x+phi)',  // With parameters
-        'A*exp(-x^2/2)',   // With parameters
-        'k*x^2 + offset'   // With parameters
-      ]
-    };
-  } catch (error) {
-    return { 
-      valid: false, 
-      error: error instanceof Error ? error.message : 'Invalid expression',
-      examples: ['0.5*x^2', 'exp(-x^2)', 'sin(x)', 'sinh(x)', 'A*sin(k*x+phi)']
-    };
-  }
+    const evaluate = compileRealExpression(expression, parameters);
+    [0, 1, -1, 0.5, -0.5].forEach(x => evaluate(x));
+    return { valid: true };
+  } catch (error) { return { valid: false, error: error instanceof Error ? error.message : String(error) }; }
 }
 
 /**

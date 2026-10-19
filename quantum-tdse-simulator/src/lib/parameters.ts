@@ -1,3 +1,4 @@
+import { compileExpression, expressionSymbols, RESERVED } from './expressions';
 /**
  * Parameter Management System for Desmos-style Custom Functions
  * Supports parameter-based function evaluation with sliders
@@ -53,53 +54,9 @@ export function updateParameter(
 /**
  * Extract parameter names from a function expression
  */
-export function extractParameterNames(expression: string): string[] {
-  // Find all potential parameter names (single letters followed by optional digits)
-  const parameterPattern = /\b([a-zA-Z][a-zA-Z0-9]*)(?!\s*\()/g;
-  const matches = expression.match(parameterPattern) || [];
-  
-  // Reserved keywords that shouldn't be treated as parameters
-  const reservedKeywords = new Set([
-    'x', 't', 'i', 'pi', 'e', 'sin', 'cos', 'tan', 'sinh', 'cosh', 'tanh',
-    'exp', 'sqrt', 'abs', 'log', 'ln', 'true', 'false', 'if', 'else'
-  ]);
-  
-  // Filter out reserved keywords and variables
-  const potentialParameters = matches.filter(name => 
-    !reservedKeywords.has(name.toLowerCase()) && 
-    name.length > 1 // Only multi-character names can be parameters
-  );
-  
-  // Get unique parameter names
-  return [...new Set(potentialParameters)];
-}
-
-/**
- * Extract all single-letter variables that could be parameters
- */
-export function extractSingleLetterVariables(expression: string): string[] {
-  const singleLetterPattern = /\b([a-zA-Z])(?!\s*\()/g;
-  const matches = expression.match(singleLetterPattern) || [];
-  
-  // Variables that are built-in
-  const builtInVariables = new Set(['x', 't', 'i']);
-  
-  // Filter out built-in variables
-  const potentialParameters = matches.filter(letter => 
-    !builtInVariables.has(letter.toLowerCase())
-  );
-  
-  return [...new Set(potentialParameters)];
-}
-
-/**
- * Validate parameter names (must be valid identifiers)
- */
-export function isValidParameterName(name: string): boolean {
-  // Parameter names must start with letter, can contain letters and numbers
-  const namePattern = /^[a-zA-Z][a-zA-Z0-9]*$/;
-  return namePattern.test(name) && name.length > 1; // At least 2 characters
-}
+export function extractParameterNames(expression: string): string[] { return expressionSymbols(expression); }
+export function extractSingleLetterVariables(expression: string): string[] { return expressionSymbols(expression).filter(name => name.length === 1); }
+export function isValidParameterName(name: string): boolean { return /^[a-zA-Z][a-zA-Z0-9]*$/.test(name) && !RESERVED.has(name); }
 
 /**
  * Replace parameters in expression with their values
@@ -122,55 +79,11 @@ export function substituteParameters(
 /**
  * Validate expression with parameters
  */
-export function validateParameterExpression(
-  expression: string,
-  parameters: ParameterSet
-): {
-  valid: boolean;
-  error?: string;
-  missingParameters?: string[];
-} {
-  try {
-    // Check for missing parameters
-    const singleLetterParams = extractSingleLetterVariables(expression);
-    const allParams = [
-      ...extractParameterNames(expression),
-      ...singleLetterParams
-    ];
-    
-    const missingParameters = allParams.filter(paramName => 
-      !parameters[paramName]
-    );
-    
-    if (missingParameters.length > 0) {
-      return {
-        valid: false,
-        error: `Missing parameters: ${missingParameters.join(', ')}`,
-        missingParameters
-      };
-    }
-    
-    // Test expression with parameter values substituted
-    const substitutedExpression = substituteParameters(expression, parameters);
-    
-    // Basic syntax validation by attempting to parse
-    const testEval = new Function('Math', `return ${substitutedExpression}`)(Math);
-    
-    if (typeof testEval !== 'number' || !isFinite(testEval)) {
-      return {
-        valid: false,
-        error: 'Expression evaluates to non-finite number'
-      };
-    }
-    
-    return { valid: true };
-    
-  } catch (error) {
-    return {
-      valid: false,
-      error: error instanceof Error ? error.message : 'Invalid expression'
-    };
-  }
+export function validateParameterExpression(expression: string, parameters: ParameterSet): { valid: boolean; error?: string; missingParameters?: string[] } {
+  const missingParameters = expressionSymbols(expression).filter(name => !Object.prototype.hasOwnProperty.call(parameters, name));
+  if (missingParameters.length) return { valid: false, error: `Define parameters: ${missingParameters.join(', ')}`, missingParameters };
+  try { compileExpression(expression, parameters)(0, 0); return { valid: true }; }
+  catch (error) { return { valid: false, error: error instanceof Error ? error.message : String(error) }; }
 }
 
 /**

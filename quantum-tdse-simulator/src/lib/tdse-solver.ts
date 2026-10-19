@@ -7,7 +7,8 @@
  */
 
 import FFT from 'fft.js';
-import { ParameterSet, substituteParameters } from './parameters';
+import type { ParameterSet } from './parameters';
+import { compileWavefunction } from './wavefunctions';
 
 export interface SimulationParameters {
   gridSize: number;           // Number of spatial grid points (power of 2)
@@ -26,6 +27,8 @@ export interface WavefunctionState {
   imag: Float64Array;         // Imaginary part of wavefunction
   time: number;               // Current time
 }
+
+export interface Eigenmode { energy: number; state: WavefunctionState; residual: number; converged: boolean }
 
 export class TDSESolver {
   private params: SimulationParameters;
@@ -51,9 +54,14 @@ export class TDSESolver {
   
   // Current potential
   private potential: Float64Array;
+  private workInput: number[];
+  private workMomentum: number[];
+  private workOutput: number[];
   
   constructor(params: SimulationParameters) {
-    this.params = params;
+    if (!Number.isInteger(params.gridSize) || params.gridSize < 64 || params.gridSize > 4096 || (params.gridSize & (params.gridSize - 1)) !== 0) throw new Error('Grid must be a power of two between 64 and 4096.');
+    if (![params.xMin, params.xMax, params.dt, params.hbar, params.mass].every(Number.isFinite) || params.xMax <= params.xMin || params.dt <= 0 || params.hbar <= 0 || params.mass <= 0) throw new Error('Use a positive time step and an increasing finite domain.');
+    this.params = { ...params };
     
     // Ensure grid size is power of 2 for FFT
     const n = Math.pow(2, Math.ceil(Math.log2(params.gridSize)));
@@ -62,6 +70,9 @@ export class TDSESolver {
     // Initialize FFT
     this.fft = new FFT(n);
     this.ifft = new FFT(n);
+    this.workInput = this.fft.createComplexArray();
+    this.workMomentum = this.fft.createComplexArray();
+    this.workOutput = this.fft.createComplexArray();
     
     // Setup spatial grid
     this.dx = (params.xMax - params.xMin) / n;
@@ -153,7 +164,8 @@ export class TDSESolver {
       throw new Error(`Potential array size ${V.length} doesn't match grid size ${this.params.gridSize}`);
     }
     
-    this.potential = V;
+    if (!V.every(Number.isFinite)) throw new Error('Potential contains non-finite values.');
+    this.potential = new Float64Array(V);
     
     // Update potential operator
     const { dt, hbar } = this.params;
@@ -211,43 +223,17 @@ export class TDSESolver {
     // Step 1: Apply potential operator (half step)
     this.applyPotentialOperator(state.real, state.imag);
     
-    // Step 2: Transform to momentum space
-    const psi_interleaved = new Float64Array(2 * n);
+    // Reuse FFT scratch storage, avoiding allocations in each evolution step.
+    for (let i = 0; i < n; i++) { this.workInput[2*i] = state.real[i]; this.workInput[2*i+1] = state.imag[i]; }
+    this.fft.transform(this.workMomentum, this.workInput);
     for (let i = 0; i < n; i++) {
-      psi_interleaved[2 * i] = state.real[i];
-      psi_interleaved[2 * i + 1] = state.imag[i];
+      const re = this.workMomentum[2*i], im = this.workMomentum[2*i+1];
+      this.workMomentum[2*i] = re*this.expT_real[i] - im*this.expT_imag[i];
+      this.workMomentum[2*i+1] = re*this.expT_imag[i] + im*this.expT_real[i];
     }
-    
-    const psi_k = this.fft.createComplexArray();
-    this.fft.transform(psi_k, psi_interleaved);
-    
-    // Extract real and imaginary parts
-    const psi_k_real = new Float64Array(n);
-    const psi_k_imag = new Float64Array(n);
-    for (let i = 0; i < n; i++) {
-      psi_k_real[i] = psi_k[2 * i];
-      psi_k_imag[i] = psi_k[2 * i + 1];
-    }
-    
-    // Step 3: Apply kinetic operator in momentum space
-    this.applyKineticOperator(psi_k_real, psi_k_imag);
-    
-    // Step 4: Transform back to position space
-    const psi_k_interleaved = new Float64Array(2 * n);
-    for (let i = 0; i < n; i++) {
-      psi_k_interleaved[2 * i] = psi_k_real[i];
-      psi_k_interleaved[2 * i + 1] = psi_k_imag[i];
-    }
-    
-    const psi_out = this.fft.createComplexArray();
-    this.fft.inverseTransform(psi_out, psi_k_interleaved);
-    
-    // Extract from FFT size (fft.js already divides by N internally)
-    for (let i = 0; i < n; i++) {
-      state.real[i] = psi_out[2 * i];
-      state.imag[i] = psi_out[2 * i + 1];
-    }
-    
+    this.fft.inverseTransform(this.workOutput, this.workMomentum);
+    for (let i = 0; i < n; i++) { state.real[i] = this.workOutput[2*i]; state.imag[i] = this.workOutput[2*i+1]; }
+
     // Step 5: Apply potential operator (half step)
     this.applyPotentialOperator(state.real, state.imag);
     
@@ -262,10 +248,7 @@ export class TDSESolver {
     // Update time
     state.time += this.params.dt;
     
-    // Normalize wavefunction to ensure probability conservation (only if ABC is disabled)
-    if (!this.params.abcEnabled) {
-      this.normalize(state);
-    }
+    // Expose raw norm drift: never renormalize real-time propagation.
     
     return state;
   }
@@ -321,7 +304,7 @@ export class TDSESolver {
   /**
    * Calculate expectation value of energy: <E> = <ψ|Ĥ|ψ>
    */
-  getEnergy(state: WavefunctionState): number {
+  getEnergyIntegral(state: WavefunctionState): number {
     const n = this.params.gridSize;
     const { hbar, mass } = this.params;
     
@@ -355,6 +338,53 @@ export class TDSESolver {
     return kineticEnergy + potentialEnergy;
   }
   
+  /** Conditional energy of the surviving state. */
+  getEnergy(state: WavefunctionState): number {
+    const norm = this.getTotalProbability(state);
+    return norm > 1e-14 ? this.getEnergyIntegral(state) / norm : NaN;
+  }
+
+  /** Includes a final fractional step; no falsified timestamp. */
+  advanceTo(state: WavefunctionState, target: number): void {
+    if (!Number.isFinite(target) || target < state.time - 1e-10) throw new Error('Target time must be finite and cannot precede the checkpoint.');
+    const dt = this.params.dt;
+    while (target - state.time >= dt - 1e-12) this.step(state);
+    const remaining = target - state.time;
+    if (remaining > 1e-11) {
+      this.params.dt = remaining; this.updateKineticOperator(); this.setPotential(this.potential); this.updateAbsorbingMask();
+      try { this.step(state); }
+      finally { this.params.dt = dt; this.updateKineticOperator(); this.setPotential(this.potential); this.updateAbsorbingMask(); }
+    }
+    state.time = target;
+  }
+
+  getMomentumDistribution(state: WavefunctionState): { p: Float64Array; density: Float64Array } {
+    const n = this.x.length, input = this.fft.createComplexArray(), output = this.fft.createComplexArray();
+    for (let i = 0; i < n; i++) { input[2*i] = state.real[i]; input[2*i+1] = state.imag[i]; }
+    this.fft.transform(output, input);
+    const p = new Float64Array(n), density = new Float64Array(n);
+    for (let j = 0; j < n; j++) {
+      const i = (j + n / 2) % n;
+      p[j] = this.params.hbar * this.k[i];
+      density[j] = (output[2*i]**2 + output[2*i+1]**2) * this.dx / (n * this.dk * this.params.hbar);
+    }
+    return { p, density };
+  }
+
+  eigenResidual(state: WavefunctionState, energy = this.getEnergy(state)): number {
+    const n = this.x.length, input = this.fft.createComplexArray(), output = this.fft.createComplexArray(), back = this.fft.createComplexArray();
+    for (let i = 0; i < n; i++) { input[2*i] = state.real[i]; input[2*i+1] = state.imag[i]; }
+    this.fft.transform(output, input);
+    for (let i = 0; i < n; i++) {
+      const kinetic = this.params.hbar**2 * this.k[i]**2 / (2*this.params.mass);
+      output[2*i] *= kinetic; output[2*i+1] *= kinetic;
+    }
+    this.fft.inverseTransform(back, output);
+    let residual = 0;
+    for (let i = 0; i < n; i++) residual += (back[2*i] + (this.potential[i]-energy)*state.real[i])**2 + (back[2*i+1] + (this.potential[i]-energy)*state.imag[i])**2;
+    return Math.sqrt(residual * this.dx / this.getTotalProbability(state));
+  }
+
   /**
    * Check if wavefunction has significant probability near boundaries
    */
@@ -426,10 +456,10 @@ export class TDSESolver {
    * Find first N bound eigenstates and their corresponding energy eigenvalues
    * uses imaginary time propagation combined with Gram-Schmidt orthogonalization.
    */
-  findEigenstates(count: number = 4, maxIterations: number = 1000): { energy: number; state: WavefunctionState }[] {
-    const eigenstates: { energy: number; state: WavefunctionState }[] = [];
+  findEigenstates(count: number = 4, maxIterations: number = 2400): Eigenmode[] {
+    const eigenstates: Eigenmode[] = [];
     const n = this.params.gridSize;
-    const dTau = 0.05; // imaginary step size
+    const dTau = 0.02; // imaginary step size
     
     // Helper to generate a localized broad Gaussian trial state
     const createTrialState = (shift: number): WavefunctionState => {
@@ -444,7 +474,7 @@ export class TDSESolver {
       for (let i = 0; i < n; i++) {
         const dx = this.x[i] - center;
         // Broad gaussian + random noise to break parity symmetry
-        real[i] = Math.exp(-dx * dx / (2 * sigma * sigma)) + (Math.random() - 0.5) * 0.01;
+        real[i] = Math.exp(-dx * dx / (2 * sigma * sigma)) + Math.sin(i * 12.9898 + shift * 78.233) * 0.01;
         imag[i] = 0;
       }
       const state = { real, imag, time: 0 };
@@ -486,7 +516,7 @@ export class TDSESolver {
         // Check energy convergence every 10 iterations
         if (iter > 0 && iter % 10 === 0) {
           const currentEnergy = this.getEnergy(trial);
-          if (Math.abs(currentEnergy - prevEnergy) < 1e-6) {
+          if (Math.abs(currentEnergy - prevEnergy) < 1e-9 && this.eigenResidual(trial, currentEnergy) < 1e-3) {
             prevEnergy = currentEnergy;
             break;
           }
@@ -518,6 +548,8 @@ export class TDSESolver {
       
       eigenstates.push({
         energy: finalEnergy,
+        residual: this.eigenResidual(trial, finalEnergy),
+        converged: this.eigenResidual(trial, finalEnergy) < 1e-3,
         state: {
           real: new Float64Array(trial.real),
           imag: new Float64Array(trial.imag),
@@ -648,107 +680,13 @@ export function createBoundState(
   return state;
 }
 
-/**
- * Parse complex function for custom wavefunctions with parameter support
- */
-function parseComplexFunction(
-  realExpr: string,
-  imagExpr: string,
-  x: number,
-  t: number = 0,
-  parameters: ParameterSet = {}
-): { real: number; imag: number } {
-  const safeEval = (expr: string, xVal: number, tVal: number = 0): number => {
-    try {
-      if (!expr || expr.trim() === '') {
-        return 0;
-      }
-      
-      // Replace parameters with their values
-      let evalExpr = substituteParameters(expr, parameters);
-      
-      evalExpr = evalExpr
-        .replace(/\bx\b/g, `(${xVal})`)
-        .replace(/\bt\b/g, `(${tVal})`)
-        .replace(/\bi\b/g, '(1)');
-      
-      evalExpr = evalExpr.replace(/\^/g, '**');
-      evalExpr = evalExpr.replace(/\bsin\s*\(/g, 'Math.sin(');
-      evalExpr = evalExpr.replace(/\bcos\s*\(/g, 'Math.cos(');
-      evalExpr = evalExpr.replace(/\btan\s*\(/g, 'Math.tan(');
-      evalExpr = evalExpr.replace(/\bsinh\s*\(/g, 'Math.sinh(');
-      evalExpr = evalExpr.replace(/\bcosh\s*\(/g, 'Math.cosh(');
-      evalExpr = evalExpr.replace(/\btanh\s*\(/g, 'Math.tanh(');
-      evalExpr = evalExpr.replace(/\bexp\s*\(/g, 'Math.exp(');
-      evalExpr = evalExpr.replace(/\bsqrt\s*\(/g, 'Math.sqrt(');
-      evalExpr = evalExpr.replace(/\babs\s*\(/g, 'Math.abs(');
-      evalExpr = evalExpr.replace(/\blog\s*\(/g, 'Math.log(');
-      evalExpr = evalExpr.replace(/\bln\s*\(/g, 'Math.log(');
-      evalExpr = evalExpr.replace(/\bpi\b/gi, 'Math.PI');
-      evalExpr = evalExpr.replace(/\be\b/g, 'Math.E');
-      
-      const result = new Function('Math', `return ${evalExpr}`)(Math);
-      
-      if (typeof result !== 'number' || !isFinite(result)) {
-        throw new Error(`Non-finite result: ${result}`);
-      }
-      
-      return result;
-    } catch (error) {
-      throw new Error(`Failed to evaluate "${expr}" at x=${xVal}, t=${tVal}: ${error}`);
-    }
-  };
-  
-  const real = realExpr.trim() ? safeEval(realExpr, x, t) : 0;
-  const imag = imagExpr.trim() ? safeEval(imagExpr, x, t) : 0;
-  
-  return { real, imag };
-}
-
-/**
- * Create custom wavefunction from mathematical expressions with parameter support
- */
-export function createCustomWavefunction(
-  solver: TDSESolver,
-  realExpr: string,
-  imagExpr: string,
-  parameters: ParameterSet = {}
-): WavefunctionState {
-  const n = solver.x.length;
-  const state: WavefunctionState = {
-    real: new Float64Array(n),
-    imag: new Float64Array(n),
-    time: 0,
-  };
-  
-  // Evaluate at each grid point
-  for (let i = 0; i < n; i++) {
-    const x = solver.x[i];
-    try {
-      const { real, imag } = parseComplexFunction(realExpr, imagExpr, x, 0, parameters);
-      state.real[i] = real;
-      state.imag[i] = imag;
-    } catch (error) {
-      // Set to zero if evaluation fails
-      console.warn(`Failed to evaluate wavefunction at x=${x}:`, error);
-      state.real[i] = 0;
-      state.imag[i] = 0;
-    }
-  }
-  
-  // Normalize
-  let norm = 0;
-  for (let i = 0; i < n; i++) {
-    norm += state.real[i] * state.real[i] + state.imag[i] * state.imag[i];
-  }
-  norm = Math.sqrt(norm * solver.dx);
-  
-  if (norm > 0) {
-    for (let i = 0; i < n; i++) {
-      state.real[i] /= norm;
-      state.imag[i] /= norm;
-    }
-  }
-  
+/** Compile once, evaluate the entire grid, and reject invalid/zero states atomically. */
+export function createCustomWavefunction(solver: TDSESolver, realExpr: string, imagExpr: string, parameters: ParameterSet = {}): WavefunctionState {
+  const evaluate = compileWavefunction(realExpr, imagExpr, parameters);
+  const state: WavefunctionState = { real: new Float64Array(solver.x.length), imag: new Float64Array(solver.x.length), time: 0 };
+  solver.x.forEach((x, i) => { const value = evaluate(x); state.real[i] = value.real; state.imag[i] = value.imag; });
+  const norm = Math.sqrt(solver.getTotalProbability(state));
+  if (!(norm > 1e-100) || !Number.isFinite(norm)) throw new Error('The wavefunction must have finite, nonzero probability on this grid.');
+  state.real.forEach((_, i) => { state.real[i] /= norm; state.imag[i] /= norm; });
   return state;
 }
