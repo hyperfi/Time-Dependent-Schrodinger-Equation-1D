@@ -9,6 +9,7 @@ export interface HistoryRow {
 import {
   renderPosition,
   potentialBounds,
+  momentumDisplayLimit,
   PLOT_COLORS,
 } from "../lib/plot-renderer";
 const font = "11px Consolas, monospace";
@@ -174,10 +175,7 @@ export function MomentumPlot({
       distributions = [a, b]
         .filter(Boolean)
         .map((r) => r!.solver.getMomentumDistribution(r!.state));
-    const limit = Math.min(
-        Math.PI / a.solver.dx,
-        Math.max(8, Math.abs(a.config.wavefunctionK0) + 5),
-      ),
+    const limit = momentumDisplayLimit(distributions),
       peak =
         Math.max(0.1, ...distributions.flatMap((d) => Array.from(d.density))) *
         1.15;

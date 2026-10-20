@@ -61,8 +61,12 @@ export async function exportSequence(input: {
     ctx.fillStyle = "#233c33";
     ctx.font = "600 22px system-ui";
     ctx.fillText("Quantum TDSE · Experiment snapshot", 49, 38);
-    ctx.save(); ctx.textAlign = "right"; ctx.font = "13px system-ui"; ctx.fillStyle = "#637268";
-    ctx.fillText("Created by Dr. Abhishek", 1231, 38); ctx.restore();
+    ctx.save();
+    ctx.textAlign = "right";
+    ctx.font = "13px system-ui";
+    ctx.fillStyle = "#637268";
+    ctx.fillText("Created by Dr. Abhishek", 1231, 38);
+    ctx.restore();
     ctx.font = "14px monospace";
     ctx.fillStyle = "#657b6e";
     ctx.fillText(

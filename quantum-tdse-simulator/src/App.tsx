@@ -85,6 +85,7 @@ function App() {
     [fps, setFps] = useState(24),
     exportAbort = useRef<AbortController | null>(null);
   const fileInput = useRef<HTMLInputElement>(null),
+    setupSlot = useRef<HTMLDivElement>(null),
     plotCanvas = useRef<HTMLCanvasElement | null>(null),
     history = useRef<HistoryRow[]>([]);
   const { a, b, fork } = session.current,
@@ -159,6 +160,56 @@ function App() {
     frame = requestAnimationFrame(advance);
     return () => cancelAnimationFrame(frame);
   }, [running, speed, refresh, recordHistory]);
+
+  useEffect(() => {
+    if (!mobileSetup) return;
+    const slot = setupSlot.current!,
+      previous = document.activeElement as HTMLElement | null;
+    const bodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusable = () =>
+      Array.from(
+        slot.querySelectorAll<HTMLElement>(
+          "button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, a[href]",
+        ),
+      ).filter(
+        (node) =>
+          node.getClientRects().length > 0 &&
+          !node.classList.contains("setup-scrim"),
+      );
+    slot.querySelector<HTMLElement>(".mobile-close")?.focus();
+    const key = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMobileSetup(false);
+      }
+      if (event.key !== "Tab") return;
+      const items = focusable(),
+        first = items[0],
+        last = items[items.length - 1];
+      if (
+        event.shiftKey &&
+        (document.activeElement === first ||
+          !slot.contains(document.activeElement))
+      ) {
+        event.preventDefault();
+        last?.focus();
+      } else if (
+        !event.shiftKey &&
+        (document.activeElement === last ||
+          !slot.contains(document.activeElement))
+      ) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("keydown", key);
+      document.body.style.overflow = bodyOverflow;
+      previous?.focus();
+    };
+  }, [mobileSetup]);
 
   const changeConfig = (change: Partial<Config>, structural = false) => {
     if (exporting) return;
@@ -579,7 +630,13 @@ function App() {
         />
       </header>
       <div className="workspace">
-        <div className={`setup-slot ${mobileSetup ? "is-open" : ""}`}>
+        <div
+          ref={setupSlot}
+          role={mobileSetup ? "dialog" : undefined}
+          aria-modal={mobileSetup ? true : undefined}
+          aria-label={mobileSetup ? "Experiment setup" : undefined}
+          className={`setup-slot ${mobileSetup ? "is-open" : ""}`}
+        >
           {mobileSetup && (
             <button
               className="setup-scrim"

@@ -112,7 +112,10 @@ export function createCustomFunctionPotential(
   expression: string,
   parameters: ParameterSet = {},
 ): Float64Array {
-  if (/\bt\b/.test(expression)) throw new Error("This release supports static V(x). Time-dependent potentials are not implemented.");
+  if (/\bt\b/.test(expression))
+    throw new Error(
+      "This release supports static V(x). Time-dependent potentials are not implemented.",
+    );
   const evaluate = compileRealExpression(expression, parameters);
   return Float64Array.from(x, (xi) => evaluate(xi));
 }
@@ -234,8 +237,11 @@ export function validatePotentialFunction(
   parameters: ParameterSet = {},
 ): { valid: boolean; error?: string; examples?: string[] } {
   try {
-    if (/\bt\b/.test(expression)) throw new Error("This release supports static V(x). Time-dependent potentials are not implemented.");
-  const evaluate = compileRealExpression(expression, parameters);
+    if (/\bt\b/.test(expression))
+      throw new Error(
+        "This release supports static V(x). Time-dependent potentials are not implemented.",
+      );
+    const evaluate = compileRealExpression(expression, parameters);
     [0, 1, -1, 0.5, -0.5].forEach((x) => evaluate(x));
     return { valid: true };
   } catch (error) {

@@ -23,6 +23,27 @@ export function potentialBounds(runtime: Runtime) {
   return { min: Math.max(-30, min * 1.15), max: Math.min(30, max * 1.2) };
 }
 
+/** Fit at least 99.9% of each actual branch distribution, capped by Nyquist. */
+export function momentumDisplayLimit(
+  distributions: { p: Float64Array; density: Float64Array }[],
+) {
+  let extent = 8,
+    nyquist = Infinity;
+  for (const { p, density } of distributions) {
+    nyquist = Math.min(nyquist, Math.abs(p[0]));
+    const total = density.reduce((sum, value) => sum + value, 0);
+    if (!(total > 1e-100)) continue;
+    let cumulative = 0;
+    for (let i = 0; i < p.length; i++) {
+      const previous = cumulative;
+      cumulative += density[i] / total;
+      if (cumulative >= 0.0005 && previous <= 0.9995)
+        extent = Math.max(extent, Math.abs(p[i]) * 1.1);
+    }
+  }
+  return Math.min(nyquist, extent);
+}
+
 export function renderPosition(
   ctx: CanvasRenderingContext2D,
   width: number,

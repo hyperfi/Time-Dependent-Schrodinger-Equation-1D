@@ -1,3 +1,4 @@
+import { momentumDisplayLimit } from "../src/lib/plot-renderer";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -267,5 +268,27 @@ test("credit and sticky navigation remain part of the shipped surface", () => {
       app.includes("https://www.dr-abhishek.com/"),
   );
   assert.match(css, /\.app-header\s*\{[^}]*position:\s*sticky;[^}]*top:\s*0;/);
+});
+test("momentum framing includes a high-momentum custom state in either branch", () => {
+  const a = createRuntime(DEFAULT_CONFIG),
+    b = createRuntime({
+      ...DEFAULT_CONFIG,
+      wavefunctionType: "custom-function",
+      wavefunctionRealExpr: "exp(-(x+6)^2/4)*exp(20*i*x)",
+      wavefunctionImagExpr: "",
+    });
+  const distributions = [a, b].map((r) =>
+    r.solver.getMomentumDistribution(r.state),
+  );
+  const limit = momentumDisplayLimit(distributions);
+  assert.ok(limit > 20);
+  for (const d of distributions) {
+    const visible =
+      d.density.reduce(
+        (sum, v, i) => sum + (Math.abs(d.p[i]) <= limit ? v : 0),
+        0,
+      ) / d.density.reduce((s, v) => s + v, 0);
+    assert.ok(visible > 0.999);
+  }
 });
 console.log(`\n${checks} scientific/workflow checks passed.`);

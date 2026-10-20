@@ -47,7 +47,7 @@ The body has a 320px minimum width. Transport is sticky at the bottom (12px desk
 
 ## Interaction conventions
 
-Use visible labels, contextual scientific help, and numeric inputs alongside sliders. Potential drawing activates a crosshair and pointer capture; expression editing supplies an alternative way to define a potential. Canvas accessible names point users to numerical measurements. Keep the skip link, teal 2px focus-visible outlines with 3px offset, named icon actions, and keyboard shortcuts (Space, right arrow, Escape) that do not interrupt typing. Right-side dialogs trap focus and restore it when closed.
+Use visible labels, contextual scientific help, and numeric inputs alongside sliders. Potential drawing activates a crosshair and pointer capture; expression editing supplies an alternative way to define a potential. Canvas accessible names point users to numerical measurements. Keep the skip link, teal 2px focus-visible outlines with 3px offset, named icon actions, and keyboard shortcuts (Space, right arrow, Escape) that do not interrupt typing. Right-side dialogs and the mobile setup sheet transfer and trap focus, close with Escape, and restore focus when closed. The setup sheet also locks background scrolling. Momentum framing fits the actual central 99.9% of both branch distributions, rather than a preparation slider.
 
 UI transitions are brief (160ms colors and scrim; 200ms drawer entry). Reduced-motion preference disables animations and transitions. Simulation evolution remains data-driven, not decorative motion.
 
